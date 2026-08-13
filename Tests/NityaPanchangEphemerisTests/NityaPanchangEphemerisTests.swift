@@ -65,4 +65,32 @@ final class NityaPanchangEphemerisTests: XCTestCase {
         XCTAssertFalse(festivals.isEmpty)
         XCTAssertTrue(festivals.contains { $0.name == "Diwali" })
     }
+
+    /// Regression test for a real crash: the app creates a separate
+    /// EphemerisPanchaangRepository per screen (dashboard, Guna Milan, ...). Swiss
+    /// Ephemeris keeps all state in one process-global struct, and swe_set_ephe_path()
+    /// (called from init()) closes every open ephemeris file and re-probes the lunar
+    /// ephemeris via an internal swe_calc() — so constructing a fresh repository while
+    /// another one's computation is in flight used to SIGSEGV inside get_new_segment
+    /// (sweph.c) on a real device. This drives many repositories and many concurrent
+    /// calculations at once; it must complete without crashing or hanging.
+    func testConcurrentRepositoriesDoNotCrash() async throws {
+        let date = DateComponents(calendar: .init(identifier: .gregorian),
+                                   timeZone: TimeZone(identifier: "Asia/Kolkata"),
+                                   year: 2026, month: 3, day: 10, hour: 9).date!
+
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<20 {
+                group.addTask {
+                    // A fresh instance each time — this is what MainTabView + MatchInputView
+                    // do today, and is exactly the scenario that used to crash: init()
+                    // (swe_set_ephe_path) racing another instance's in-flight computation.
+                    let repository = EphemerisPanchaangRepository()
+                    _ = await repository.fetchPanchang(for: date, latitude: self.latitude, longitude: self.longitude)
+                    _ = await repository.fetchBirthChart(for: date, latitude: self.latitude, longitude: self.longitude)
+                }
+            }
+        }
+        // Reaching this line without a crash/hang is the assertion.
+    }
 }

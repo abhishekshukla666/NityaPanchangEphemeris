@@ -4,9 +4,18 @@
 //
 //  Concrete implementation of PanchaangRepository backed by the Swiss Ephemeris C library.
 //
-//  Thread-safety: SwissEphWrapper is a thin wrapper around non-thread-safe C globals.
-//  All wrapper calls run on a dedicated serial DispatchQueue; async/await callers
-//  suspend while the work is in flight and resume on their original executor.
+//  Thread-safety: the Swiss Ephemeris C library keeps ALL of its state (open file
+//  handles, segment caches, ayanamsha/sidereal mode, ...) in one process-global struct
+//  (`swed`). That state is not just non-reentrant for calculation calls — even
+//  swe_set_ephe_path() mutates it (it closes every open ephemeris file and re-probes
+//  the lunar ephemeris via an internal swe_calc() call). Two EphemerisPanchaangRepository
+//  instances each owning their own private serial queue therefore does NOT make Swiss
+//  Ephemeris calls safe: one instance's swe_set_ephe_path() can free segment buffers a
+//  second instance is mid-read of on another thread, crashing inside get_new_segment
+//  (sweph.c) — this is exactly the SIGSEGV this design previously produced when the app
+//  created a repository per screen (MainTabView + MatchInputView, both live in the same
+//  process). All Swiss Ephemeris access — including the one-time ephe-path setup — must
+//  therefore funnel through a single queue shared by every instance in the process.
 //
 
 import CSwissEphemeris
@@ -19,12 +28,24 @@ private enum EphKey {
 
 public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked Sendable {
 
-    private let wrapper = SwissEphWrapper()
-    private let queue   = DispatchQueue(label: EphKey.queueLabel, qos: .userInitiated)
+    // Shared across every instance in the process — NOT an instance property. Swiss
+    // Ephemeris's global C state can only ever be touched from one thread at a time,
+    // no matter how many EphemerisPanchaangRepository instances the app creates.
+    private static let queue = DispatchQueue(label: EphKey.queueLabel, qos: .userInitiated)
 
-    public init() {
+    // Runs swe_set_ephe_path exactly once per process (Swift's static-let initialization
+    // is itself thread-safe), and only ever on `queue`, so it can never race a
+    // calculation already in flight on another instance.
+    private static let configureEphePath: Void = {
         guard let path = Bundle.module.resourcePath?.appending("/EphemerisData") else { return }
         path.withCString { swe_set_ephe_path(UnsafeMutablePointer(mutating: $0)) }
+    }()
+
+    private let wrapper = SwissEphWrapper()
+    private var queue: DispatchQueue { Self.queue }
+
+    public init() {
+        Self.queue.sync { _ = Self.configureEphePath }
     }
 
     // MARK: - PanchaangRepository
