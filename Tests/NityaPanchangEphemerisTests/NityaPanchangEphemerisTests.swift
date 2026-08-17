@@ -93,4 +93,74 @@ final class NityaPanchangEphemerisTests: XCTestCase {
         }
         // Reaching this line without a crash/hang is the assertion.
     }
+
+    // MARK: - Eclipses (Grahan)
+
+    private func date(_ year: Int, _ month: Int, _ day: Int, hour: Int = 12) -> Date {
+        DateComponents(calendar: .init(identifier: .gregorian),
+                       timeZone: TimeZone(identifier: "Asia/Kolkata"),
+                       year: year, month: month, day: day, hour: hour).date!
+    }
+
+    func testGrahansAreInternallyConsistent() async throws {
+        let repository: PanchaangRepository = EphemerisPanchaangRepository()
+        let start = date(2025, 1, 1)
+        let end   = date(2028, 1, 1)
+
+        let grahans = await repository.fetchGrahans(from: start, to: end,
+                                                    latitude: latitude, longitude: longitude)
+
+        XCTAssertFalse(grahans.isEmpty, "three years should contain at least one eclipse visible from Ujjain")
+
+        var previousPeak = Date.distantPast
+        for grahan in grahans {
+            XCTAssertGreaterThanOrEqual(grahan.peak, start, "\(grahan.name) peaks before the window")
+            XCTAssertLessThanOrEqual(grahan.peak, end, "\(grahan.name) peaks after the window")
+            XCTAssertLessThanOrEqual(grahan.begins, grahan.peak, "\(grahan.name) begins after its peak")
+            XCTAssertGreaterThanOrEqual(grahan.ends, grahan.peak, "\(grahan.name) ends before its peak")
+            XCTAssertGreaterThan(grahan.magnitude, 0, "\(grahan.name) has no magnitude")
+            XCTAssertGreaterThanOrEqual(grahan.peak, previousPeak, "results are not in time order")
+            previousPeak = grahan.peak
+
+            if let totalityBegins = grahan.totalityBegins, let totalityEnds = grahan.totalityEnds {
+                XCTAssertLessThan(totalityBegins, totalityEnds)
+                XCTAssertGreaterThanOrEqual(totalityBegins, grahan.begins)
+                XCTAssertLessThanOrEqual(totalityEnds, grahan.ends)
+            }
+        }
+    }
+
+    /// The total lunar eclipse of 7–8 September 2025 was visible across India.
+    /// Anchors that the local search actually finds real events at this location.
+    func testKnownLunarEclipseVisibleFromUjjainIsFound() async throws {
+        let repository: PanchaangRepository = EphemerisPanchaangRepository()
+        let grahans = await repository.fetchGrahans(from: date(2025, 8, 1), to: date(2025, 10, 1),
+                                                    latitude: latitude, longitude: longitude)
+
+        let calendar = Calendar(identifier: .gregorian)
+        let match = grahans.first { grahan in
+            grahan.kind == .lunar &&
+            grahan.occurs(on: self.date(2025, 9, 7), calendar: calendar)
+        }
+
+        XCTAssertNotNil(match, "expected the 7 Sep 2025 lunar eclipse; got \(grahans.map(\.name))")
+        XCTAssertEqual(match?.extent, .total, "7 Sep 2025 was a total lunar eclipse")
+    }
+
+    /// The total solar eclipse of 12 August 2026 tracked over Iceland and Spain —
+    /// India was on the night side. It must NOT appear for Ujjain, which is the
+    /// whole point of using the location-aware search rather than the global one.
+    func testSolarEclipseNotVisibleFromUjjainIsExcluded() async throws {
+        let repository: PanchaangRepository = EphemerisPanchaangRepository()
+        let grahans = await repository.fetchGrahans(from: date(2026, 8, 1), to: date(2026, 8, 20),
+                                                    latitude: latitude, longitude: longitude)
+
+        let calendar = Calendar(identifier: .gregorian)
+        let solarOn12Aug = grahans.first { grahan in
+            grahan.kind == .solar &&
+            grahan.occurs(on: self.date(2026, 8, 12), calendar: calendar)
+        }
+
+        XCTAssertNil(solarOn12Aug, "12 Aug 2026 solar eclipse is not visible from Ujjain but was returned")
+    }
 }

@@ -467,4 +467,86 @@ static void getAmantaMonthDetails(SwissEphWrapper *self, double jd, int *monthIn
     return asc;
 }
 
+// MARK: - Eclipses (Grahan)
+//
+// Both use the *_when_loc variants rather than *_when_glob. The global search
+// finds every eclipse on Earth; the local search finds only those actually
+// visible from the given place and returns local contact times. That is the
+// distinction the app needs, because Sutak is observed only where the eclipse
+// is visible — reporting a Chilean eclipse to a user in Ujjain would imply an
+// observance that does not apply.
+//
+// Swiss Ephemeris requires tret[10] and attr[20]; both are oversized here so a
+// future flag that writes further into the arrays cannot overflow the stack.
+
+- (nullable NSDictionary *)nextSolarEclipseVisibleFromJD:(double)startJD
+                                                latitude:(double)lat
+                                               longitude:(double)lon
+                                             maxDaysAhead:(double)maxDays {
+    // geopos is longitude-first, then latitude, then altitude in metres.
+    double geopos[3] = { lon, lat, 0.0 };
+    double tret[20]  = {0};
+    double attr[20]  = {0};
+    char errorMessage[256] = {0};
+
+    int32 result = swe_sol_eclipse_when_loc(startJD, SEFLG_SWIEPH, geopos, tret, attr, 0, errorMessage);
+    if (result < 0) { return nil; }
+
+    double maxJD = tret[0];
+    // The local search will happily run years ahead to find a visible eclipse;
+    // anything past the caller's window is not an answer they asked for.
+    if (maxJD <= 0 || maxJD > startJD + maxDays) { return nil; }
+
+    return @{
+        @"maxJD":           @(maxJD),
+        @"firstContactJD":  @(tret[1]),
+        @"secondContactJD": @(tret[2]),
+        @"thirdContactJD":  @(tret[3]),
+        @"fourthContactJD": @(tret[4]),
+        @"isTotal":         @((result & SE_ECL_TOTAL)   != 0),
+        @"isAnnular":       @((result & (SE_ECL_ANNULAR | SE_ECL_ANNULAR_TOTAL)) != 0),
+        @"isPartial":       @((result & SE_ECL_PARTIAL) != 0),
+        // attr[0] is the fraction of the solar diameter covered at this place.
+        @"magnitude":       @(attr[0]),
+        @"isVisible":       @YES
+    };
+}
+
+- (nullable NSDictionary *)nextLunarEclipseVisibleFromJD:(double)startJD
+                                                latitude:(double)lat
+                                               longitude:(double)lon
+                                             maxDaysAhead:(double)maxDays {
+    double geopos[3] = { lon, lat, 0.0 };
+    double tret[20]  = {0};
+    double attr[20]  = {0};
+    char errorMessage[256] = {0};
+
+    int32 result = swe_lun_eclipse_when_loc(startJD, SEFLG_SWIEPH, geopos, tret, attr, 0, errorMessage);
+    if (result < 0) { return nil; }
+
+    double maxJD = tret[0];
+    if (maxJD <= 0 || maxJD > startJD + maxDays) { return nil; }
+
+    // Lunar tret layout differs from solar: [1] is unused, the phases start at [2].
+    return @{
+        @"maxJD":             @(maxJD),
+        @"partialBeginJD":    @(tret[2]),
+        @"partialEndJD":      @(tret[3]),
+        @"totalBeginJD":      @(tret[4]),
+        @"totalEndJD":        @(tret[5]),
+        @"penumbralBeginJD":  @(tret[6]),
+        @"penumbralEndJD":    @(tret[7]),
+        @"isTotal":           @((result & SE_ECL_TOTAL)     != 0),
+        @"isPartial":         @((result & SE_ECL_PARTIAL)   != 0),
+        @"isPenumbral":       @((result & SE_ECL_PENUMBRAL) != 0),
+        // Two magnitudes, and which one is meaningful depends on the eclipse:
+        // attr[0] is umbral, attr[1] penumbral. A penumbral eclipse never enters
+        // the umbra, so its attr[0] is legitimately 0 — reporting that as "the"
+        // magnitude would make a real eclipse look like a null result.
+        @"umbralMagnitude":    @(attr[0]),
+        @"penumbralMagnitude": @(attr[1]),
+        @"isVisible":          @YES
+    };
+}
+
 @end

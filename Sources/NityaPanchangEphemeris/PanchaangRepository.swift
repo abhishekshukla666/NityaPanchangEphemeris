@@ -21,4 +21,12 @@ public protocol PanchaangRepository: Sendable {
     /// Moon nakshatra/pada/rashi + Mars rashi + Lagna rashi for an arbitrary birth
     /// date+time+location — used for Guna Milan (marriage matching) and Kundli charts.
     func fetchBirthChart(for date: Date, latitude: Double, longitude: Double) async -> BirthChart
+
+    /// Eclipses VISIBLE FROM the given location between the two dates, in time order.
+    ///
+    /// Eclipses not visible from there are omitted rather than returned with a flag:
+    /// Sutak is observed only where an eclipse can actually be seen, so a globally
+    /// complete list would imply observances that do not apply to this user.
+    func fetchGrahans(from startDate: Date, to endDate: Date,
+                      latitude: Double, longitude: Double) async -> [Grahan]
 }

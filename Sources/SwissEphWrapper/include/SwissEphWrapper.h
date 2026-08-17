@@ -58,6 +58,41 @@ NS_ASSUME_NONNULL_BEGIN
 /// Returns the sidereal Ascendant (Lagna) longitude in degrees (0–360) using Lahiri ayanamsha.
 - (double)calculateAscendantAtJD:(double)jd latitude:(double)lat longitude:(double)lon;
 
+#pragma mark - Eclipses (Grahan)
+
+/// Next solar eclipse VISIBLE FROM the given place, searching forward from `startJD`.
+///
+/// Uses swe_sol_eclipse_when_loc, which is the location-aware search: it returns
+/// only eclipses actually visible at that latitude/longitude, and reports the
+/// local contact times rather than global ones. This is the distinction that
+/// matters for observance — Sutak is kept only where the eclipse is visible.
+///
+/// Returns nil if none is found inside the search window. Otherwise a dict with:
+///   maxJD, firstContactJD, secondContactJD, thirdContactJD, fourthContactJD (double)
+///   — second/third are 0 when the eclipse is not total/annular at this place.
+///   isTotal, isAnnular, isPartial (BOOL)
+///   magnitude (double), isVisible (BOOL — always YES for this call)
+- (nullable NSDictionary *)nextSolarEclipseVisibleFromJD:(double)startJD
+                                                latitude:(double)lat
+                                               longitude:(double)lon
+                                             maxDaysAhead:(double)maxDays;
+
+/// Next lunar eclipse VISIBLE FROM the given place, searching forward from `startJD`.
+///
+/// Uses swe_lun_eclipse_when_loc. A lunar eclipse is visible wherever the Moon is
+/// above the horizon during it, so this can differ from the solar case in how much
+/// of the event is observable locally.
+///
+/// Returns nil if none is found. Otherwise a dict with:
+///   maxJD, partialBeginJD, partialEndJD, totalBeginJD, totalEndJD,
+///   penumbralBeginJD, penumbralEndJD (double) — 0 where the phase does not occur
+///   isTotal, isPartial, isPenumbral (BOOL)
+///   magnitude (double), isVisible (BOOL)
+- (nullable NSDictionary *)nextLunarEclipseVisibleFromJD:(double)startJD
+                                                latitude:(double)lat
+                                               longitude:(double)lon
+                                             maxDaysAhead:(double)maxDays;
+
 @end
 
 NS_ASSUME_NONNULL_END

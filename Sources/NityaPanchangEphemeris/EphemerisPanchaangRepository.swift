@@ -83,6 +83,16 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         }
     }
 
+    public func fetchGrahans(from startDate: Date, to endDate: Date,
+                             latitude: Double, longitude: Double) async -> [Grahan] {
+        await withCheckedContinuation { continuation in
+            queue.async { [self] in
+                continuation.resume(returning: computeGrahans(from: startDate, to: endDate,
+                                                              latitude: latitude, longitude: longitude))
+            }
+        }
+    }
+
     // MARK: - Private computation (always called from `queue`)
 
     private func computePanchang(for date: Date, latitude: Double, longitude: Double) -> PanchangDay {
@@ -459,5 +469,127 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
 
     private func jdToDate(_ jd: Double) -> Date {
         Date(timeIntervalSince1970: (jd - 2_440_587.5) * 86_400)
+    }
+
+    // MARK: - Eclipses (always called from `queue`)
+
+    /// Walks the solar and lunar local-eclipse searches forward independently and
+    /// merges them. Each Swiss Ephemeris call answers only "the next one after
+    /// this instant", so finding a range means stepping past each hit and asking
+    /// again — hence the loop rather than a single call.
+    private func computeGrahans(from startDate: Date, to endDate: Date,
+                                latitude: Double, longitude: Double) -> [Grahan] {
+        guard endDate > startDate else { return [] }
+        let startJD = wrapper.getJulianDayUTC(from: startDate)
+        let endJD   = wrapper.getJulianDayUTC(from: endDate)
+
+        var found: [Grahan] = []
+
+        // Guards against a malformed result whose peak does not advance, which
+        // would otherwise spin forever asking for "the next eclipse after the
+        // same instant". Also caps pathological inputs — eclipses come at most a
+        // handful of times a year, so this is far above any real answer.
+        let maxIterations = 200
+
+        // Solar
+        var cursor = startJD
+        for _ in 0..<maxIterations {
+            guard let raw = wrapper.nextSolarEclipseVisible(fromJD: cursor,
+                                                            latitude: latitude,
+                                                            longitude: longitude,
+                                                            maxDaysAhead: endJD - cursor),
+                  let peakJD = raw["maxJD"] as? Double, peakJD > cursor
+            else { break }
+
+            found.append(solarGrahan(from: raw, peakJD: peakJD))
+            cursor = peakJD + 1.0   // step clear of this eclipse before searching again
+            if cursor >= endJD { break }
+        }
+
+        // Lunar
+        cursor = startJD
+        for _ in 0..<maxIterations {
+            guard let raw = wrapper.nextLunarEclipseVisible(fromJD: cursor,
+                                                            latitude: latitude,
+                                                            longitude: longitude,
+                                                            maxDaysAhead: endJD - cursor),
+                  let peakJD = raw["maxJD"] as? Double, peakJD > cursor
+            else { break }
+
+            found.append(lunarGrahan(from: raw, peakJD: peakJD))
+            cursor = peakJD + 1.0
+            if cursor >= endJD { break }
+        }
+
+        return found.sorted { $0.peak < $1.peak }
+    }
+
+    private func solarGrahan(from raw: [AnyHashable: Any], peakJD: Double) -> Grahan {
+        func jd(_ key: String) -> Double { raw[key] as? Double ?? 0 }
+        func flag(_ key: String) -> Bool { (raw[key] as? NSNumber)?.boolValue ?? false }
+
+        let extent: GrahanExtent = flag("isTotal")   ? .total
+                                 : flag("isAnnular") ? .annular
+                                                     : .partial
+
+        // Second/third contact are zero unless the eclipse actually reaches
+        // totality or annularity at this location.
+        let totalityStart = jd("secondContactJD")
+        let totalityEnd   = jd("thirdContactJD")
+
+        // Fall back to the peak when a contact time is missing, so the visible
+        // span is never a zero-date from 4713 BC.
+        let first  = jd("firstContactJD")
+        let fourth = jd("fourthContactJD")
+
+        return Grahan(
+            kind: .solar,
+            extent: extent,
+            peak:   jdToDate(peakJD),
+            begins: jdToDate(first  > 0 ? first  : peakJD),
+            ends:   jdToDate(fourth > 0 ? fourth : peakJD),
+            totalityBegins: totalityStart > 0 ? jdToDate(totalityStart) : nil,
+            totalityEnds:   totalityEnd   > 0 ? jdToDate(totalityEnd)   : nil,
+            magnitude: raw["magnitude"] as? Double ?? 0
+        )
+    }
+
+    private func lunarGrahan(from raw: [AnyHashable: Any], peakJD: Double) -> Grahan {
+        func jd(_ key: String) -> Double { raw[key] as? Double ?? 0 }
+        func flag(_ key: String) -> Bool { (raw[key] as? NSNumber)?.boolValue ?? false }
+
+        let extent: GrahanExtent = flag("isTotal")     ? .total
+                                 : flag("isPartial")   ? .partial
+                                 : .penumbral
+
+        let totalityStart = jd("totalBeginJD")
+        let totalityEnd   = jd("totalEndJD")
+
+        // Outermost phase that actually occurs: penumbral encloses partial, which
+        // encloses totality. A penumbral-only eclipse has no partial times at all.
+        let penumbralStart = jd("penumbralBeginJD")
+        let penumbralEnd   = jd("penumbralEndJD")
+        let partialStart   = jd("partialBeginJD")
+        let partialEnd     = jd("partialEndJD")
+
+        let begins = penumbralStart > 0 ? penumbralStart : (partialStart > 0 ? partialStart : peakJD)
+        let ends   = penumbralEnd   > 0 ? penumbralEnd   : (partialEnd   > 0 ? partialEnd   : peakJD)
+
+        // A penumbral eclipse never reaches the umbra, so its umbral magnitude is
+        // legitimately 0 — falling back to the penumbral figure keeps the reported
+        // magnitude meaningful instead of reading as "nothing happened".
+        let umbral    = raw["umbralMagnitude"]    as? Double ?? 0
+        let penumbral = raw["penumbralMagnitude"] as? Double ?? 0
+
+        return Grahan(
+            kind: .lunar,
+            extent: extent,
+            peak:   jdToDate(peakJD),
+            begins: jdToDate(begins),
+            ends:   jdToDate(ends),
+            totalityBegins: totalityStart > 0 ? jdToDate(totalityStart) : nil,
+            totalityEnds:   totalityEnd   > 0 ? jdToDate(totalityEnd)   : nil,
+            magnitude: umbral > 0 ? umbral : penumbral
+        )
     }
 }
