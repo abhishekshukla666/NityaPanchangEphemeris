@@ -135,7 +135,13 @@ public let allFestivalRules: [FestivalRule] = [
     ),
     FestivalRule(name: "Hariyali Teej",        emoji: "🌿", lunarMonth: 5,  tithiNumber: 18),
     FestivalRule(name: "Nag Panchami",         emoji: "🐍", lunarMonth: 5,  tithiNumber: 20),
-    FestivalRule(name: "Raksha Bandhan",       emoji: "🪢", lunarMonth: 5,  tithiNumber: 30),
+    FestivalRule(
+        name: "Raksha Bandhan",
+        emoji: "rakhi",
+        lunarMonth: 5,
+        tithiNumber: 30,
+        hasIcon: true
+    ),
 
     // ── Bhadrapada (6) ── [KP after Shravana Purnima] + [SP → Bhadrapada Purnima]
     FestivalRule(
