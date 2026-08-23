@@ -29,4 +29,20 @@ public protocol PanchaangRepository: Sendable {
     /// complete list would imply observances that do not apply to this user.
     func fetchGrahans(from startDate: Date, to endDate: Date,
                       latitude: Double, longitude: Double) async -> [Grahan]
+
+    /// One row per day between startDate and endDate — tithi, nakshatra, moon rashi,
+    /// vara and lunar month, all evaluated at local sunrise. For a caller matching its
+    /// own multi-day rules (e.g. Muhurat finding) against a date range.
+    func fetchDailyPanchangSummaries(from startDate: Date, to endDate: Date,
+                                      latitude: Double, longitude: Double) async -> [DailyPanchangSummary]
+}
+
+public extension PanchaangRepository {
+    /// Default no-op so existing conformers (preview/test fakes) aren't forced to
+    /// implement this the moment it's added — only EphemerisPanchaangRepository
+    /// needs the real implementation.
+    func fetchDailyPanchangSummaries(from startDate: Date, to endDate: Date,
+                                      latitude: Double, longitude: Double) async -> [DailyPanchangSummary] {
+        []
+    }
 }

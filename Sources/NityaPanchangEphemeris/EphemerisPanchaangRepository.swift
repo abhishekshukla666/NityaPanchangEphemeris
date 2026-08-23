@@ -93,7 +93,46 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         }
     }
 
+    public func fetchDailyPanchangSummaries(from startDate: Date, to endDate: Date,
+                                             latitude: Double, longitude: Double) async -> [DailyPanchangSummary] {
+        await withCheckedContinuation { continuation in
+            queue.async { [self] in
+                continuation.resume(returning: computeDailySummaries(from: startDate, to: endDate,
+                                                                      latitude: latitude, longitude: longitude))
+            }
+        }
+    }
+
     // MARK: - Private computation (always called from `queue`)
+
+    private func computeDailySummaries(from startDate: Date, to endDate: Date,
+                                        latitude: Double, longitude: Double) -> [DailyPanchangSummary] {
+        let cal = Calendar.current
+        var results: [DailyPanchangSummary] = []
+        var current = cal.startOfDay(for: startDate)
+        let end = cal.startOfDay(for: endDate)
+
+        while current <= end {
+            let sunData  = wrapper.calculateSunriseSunset(for: current, latitude: latitude, longitude: longitude)
+            let rawSunriseJD = sunData["sunriseJD"] as? Double ?? 0
+            let jdSunrise = rawSunriseJD > 2_400_000
+                ? rawSunriseJD
+                : wrapper.getJulianDayUTC(from: current.addingTimeInterval(6 * 3600))
+
+            results.append(DailyPanchangSummary(
+                date:            current,
+                tithiNumber:     Int(wrapper.calculateTithiNumber(forJulianDay: jdSunrise)),
+                nakshatraName:   PanchaangHelper.getNakshatraName(Int(wrapper.calculateNakshatra(forJulianDay: jdSunrise))),
+                moonRashiNumber: Int(wrapper.calculateMoonRashi(forJulianDay: jdSunrise)),
+                vara:            PanchaangHelper.getVaraName(for: current),
+                lunarMonth:      Int(wrapper.calculatePurnimantaMonth(forJulianDay: jdSunrise)),
+                isAdhikMaas:     wrapper.calculateIsAdhikMaas(forJulianDay: jdSunrise)
+            ))
+
+            current = cal.date(byAdding: .day, value: 1, to: current) ?? end.addingTimeInterval(1)
+        }
+        return results
+    }
 
     private func computePanchang(for date: Date, latitude: Double, longitude: Double) -> PanchangDay {
         let dayStart = Calendar.current.startOfDay(for: date)
