@@ -379,6 +379,15 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         return results
     }
 
+    // Pradosh Kaal (Diwali, Holika Dahan) and Aparahna (Dussehra) windows are computed
+    // from real sunrise/sunset, but for a fixed reference point — Ujjain, the traditional
+    // reference meridian for Indian panchangs — rather than the user's live location.
+    // These dates are meant to be one nationally-agreed day, the way a printed calendar
+    // publishes them, not something that shifts with the viewer's GPS the way a personal
+    // Muhurat/Chaughariya rightly does.
+    private static let referenceLatitude  = 23.1765
+    private static let referenceLongitude = 75.7885
+
     private func computeFestivals(from startDate: Date, to endDate: Date) -> [HinduFestival] {
         let cal = Calendar.current
         var festivals: [HinduFestival] = []
@@ -395,10 +404,17 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             let monthSunrise = Int(wrapper.calculatePurnimantaMonth(forJulianDay: jdSunrise))
             let isAdhikSunrise = wrapper.calculateIsAdhikMaas(forJulianDay: jdSunrise)
 
-            // 2. Setup Lazy Cache for Midnight
+            // 2. Setup Lazy Caches — one per non-sunrise observation instant, each only
+            // computed the first time a rule actually needs it that day.
             var cachedMidnightTithi: Int?
             var cachedMidnightMonth: Int?
             var cachedMidnightAdhik: Bool?
+            var cachedPradoshTithi: Int?
+            var cachedPradoshMonth: Int?
+            var cachedPradoshAdhik: Bool?
+            var cachedAparahnaTithi: Int?
+            var cachedAparahnaMonth: Int?
+            var cachedAparahnaAdhik: Bool?
 
             // 3. Evaluate Rules
             for rule in allFestivalRules {
@@ -406,13 +422,18 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 let activeMonth: Int
                 let isAdhik: Bool
 
-                if rule.observationTime == .midnight {
-                    // 🚀 PROXIMITY SHORT-CIRCUIT:
-                    // If the Sunrise Tithi is nowhere near the rule's target Tithi,
-                    // do not bother doing the heavy midnight math. Just skip this rule!
-                    // (We check >= 28 to handle the wrap-around from Amavasya to Pratipada)
+                // 🚀 PROXIMITY SHORT-CIRCUIT (shared by every non-sunrise instant): if the
+                // Sunrise Tithi is nowhere near the rule's target Tithi, the real instant
+                // (midnight/pradosh/aparahna, all within ~a day of sunrise) cannot be either.
+                // (We check >= 28 to handle the wrap-around from Amavasya to Pratipada.)
+                func nearSunrise() -> Bool {
                     let diff = abs(tithiSunrise - rule.tithiNumber)
-                    guard diff <= 2 || diff >= 28 else { continue }
+                    return diff <= 2 || diff >= 28
+                }
+
+                switch rule.observationTime {
+                case .midnight:
+                    guard nearSunrise() else { continue }
 
                     // ⚡️ LAZY EVALUATION: Only calculate midnight if we passed the proximity check
                     if cachedMidnightTithi == nil {
@@ -426,7 +447,54 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                     activeMonth = cachedMidnightMonth!
                     isAdhik = cachedMidnightAdhik!
 
-                } else {
+                case .pradoshKaal:
+                    guard nearSunrise() else { continue }
+
+                    if cachedPradoshTithi == nil {
+                        let sunData      = wrapper.calculateSunriseSunset(
+                            for: startOfDay, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+                        let sunsetJD     = sunData["sunsetJD"] as? Double ?? jdSunrise
+                        let nextDayStart = cal.date(byAdding: .day, value: 1, to: startOfDay)!
+                        let nextSunData  = wrapper.calculateSunriseSunset(
+                            for: nextDayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+                        let nextSunriseJD = nextSunData["sunriseJD"] as? Double ?? (sunsetJD + 0.5)
+
+                        // Pradosh Kaal: the first fifth of the night (sunset → next sunrise),
+                        // sampled at its midpoint.
+                        let nightLen  = max(nextSunriseJD - sunsetJD, 1.0 / 1440.0)
+                        let jdPradosh = sunsetJD + nightLen / 10.0
+                        cachedPradoshTithi = Int(wrapper.calculateTithiNumber(forJulianDay: jdPradosh))
+                        cachedPradoshMonth = Int(wrapper.calculatePurnimantaMonth(forJulianDay: jdPradosh))
+                        cachedPradoshAdhik = wrapper.calculateIsAdhikMaas(forJulianDay: jdPradosh)
+                    }
+
+                    activeTithi = cachedPradoshTithi!
+                    activeMonth = cachedPradoshMonth!
+                    isAdhik = cachedPradoshAdhik!
+
+                case .aparahna:
+                    guard nearSunrise() else { continue }
+
+                    if cachedAparahnaTithi == nil {
+                        let sunData      = wrapper.calculateSunriseSunset(
+                            for: startOfDay, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+                        let sunriseRefJD = sunData["sunriseJD"] as? Double ?? jdSunrise
+                        let sunsetRefJD  = sunData["sunsetJD"]  as? Double ?? (sunriseRefJD + 0.5)
+
+                        // Aparahna Kaal: the third of five equal divisions of daylight,
+                        // sampled at its midpoint.
+                        let dayLen     = max(sunsetRefJD - sunriseRefJD, 1.0 / 1440.0)
+                        let jdAparahna = sunriseRefJD + dayLen * 2.5 / 5.0
+                        cachedAparahnaTithi = Int(wrapper.calculateTithiNumber(forJulianDay: jdAparahna))
+                        cachedAparahnaMonth = Int(wrapper.calculatePurnimantaMonth(forJulianDay: jdAparahna))
+                        cachedAparahnaAdhik = wrapper.calculateIsAdhikMaas(forJulianDay: jdAparahna)
+                    }
+
+                    activeTithi = cachedAparahnaTithi!
+                    activeMonth = cachedAparahnaMonth!
+                    isAdhik = cachedAparahnaAdhik!
+
+                case .sunrise:
                     activeTithi = tithiSunrise
                     activeMonth = monthSunrise
                     isAdhik = isAdhikSunrise
@@ -464,7 +532,87 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
 
             current = cal.date(byAdding: .day, value: 1, to: current) ?? endDate.addingTimeInterval(1)
         }
+
+        festivals += kshayaFallbackFestivals(from: startDate, to: endDate, seen: &seen)
         return festivals.sorted { $0.date < $1.date }
+    }
+
+    // MARK: - Kshaya Tithi Fallback
+    //
+    // A tithi is "kshaya" (lost) when it starts after one sunrise and ends before
+    // the next — it never touches ANY sunrise, so the primary loop above (which
+    // only asks "what tithi is it AT sunrise") never finds it, and any festival
+    // pinned to that tithi silently never fires that year.
+    //
+    // The fix doesn't need the tithi's exact start/end times: a kshaya tithi is,
+    // by definition, fully contained within exactly one sunrise-to-next-sunrise
+    // window — the window of whichever day's sunrise tithi is followed, at the
+    // very next sunrise, by a number more than one higher than expected. That
+    // gap identifies both which tithi(s) were skipped and which single day
+    // contains them, unambiguously — no heuristic tie-break needed.
+    //
+    // Scoped to `.sunrise`-observed rules only (the vast majority). Midnight,
+    // Pradosh Kaal and Aparahna rules have their own anchor instants and would
+    // need their own gap-tracking to fix correctly — a deliberate follow-on,
+    // not bundled here.
+    private func kshayaFallbackFestivals(from startDate: Date, to endDate: Date,
+                                          seen: inout Set<String>) -> [HinduFestival] {
+        let cal = Calendar.current
+        let windowStart = cal.startOfDay(for: startDate)
+        let windowEnd   = cal.startOfDay(for: endDate)
+
+        // One extra day on each side so a kshaya tithi sitting right at the
+        // window's edge is still caught: the pair that reveals it may straddle
+        // the boundary, even though the day it belongs to is inside the window.
+        guard let scanStart = cal.date(byAdding: .day, value: -1, to: windowStart),
+              let scanEnd   = cal.date(byAdding: .day, value: 1, to: windowEnd) else { return [] }
+
+        var fallback: [HinduFestival] = []
+        var current = scanStart
+        var previous: (date: Date, tithi: Int, month: Int, isAdhik: Bool)?
+
+        while current <= scanEnd {
+            let startOfDay = cal.startOfDay(for: current)
+            let jdSunrise  = wrapper.getJulianDayUTC(from: startOfDay.addingTimeInterval(6 * 3600))
+            let tithi      = Int(wrapper.calculateTithiNumber(forJulianDay: jdSunrise))
+            let month      = Int(wrapper.calculatePurnimantaMonth(forJulianDay: jdSunrise))
+            let isAdhik    = wrapper.calculateIsAdhikMaas(forJulianDay: jdSunrise)
+
+            if let prev = previous, !prev.isAdhik, !isAdhik,
+               prev.date >= windowStart, prev.date <= windowEnd {
+
+                // How many tithis were skipped between prev's sunrise and this
+                // one's. A real kshaya skips exactly one tithi, very rarely two
+                // in a row; anything higher (e.g. 29, from a same-tithi repeat
+                // on a vriddhi day) is not a kshaya and must not be treated as one.
+                let gap = ((tithi - prev.tithi - 1) % 30 + 30) % 30
+                if gap >= 1, gap <= 2 {
+                    for offset in 1...gap {
+                        let skipped = ((prev.tithi - 1 + offset) % 30) + 1
+                        // Tithi 1 always opens the new lunar month, so a skipped
+                        // Pratipada belongs to the day AFTER the gap, not before.
+                        let skippedMonth = skipped == 1 ? month : prev.month
+                        guard (1...12).contains(skippedMonth) else { continue }
+
+                        for rule in allFestivalRules
+                        where rule.observationTime == .sunrise
+                            && rule.tithiNumber == skipped && rule.lunarMonth == skippedMonth {
+                            let calYear = cal.component(.year, from: prev.date)
+                            let key = "\(rule.name)-\(calYear)"
+                            if seen.insert(key).inserted {
+                                fallback.append(HinduFestival(name: rule.name, date: prev.date,
+                                                              emoji: rule.emoji, hasIcon: rule.hasIcon))
+                            }
+                        }
+                    }
+                }
+            }
+
+            previous = (startOfDay, tithi, month, isAdhik)
+            current = cal.date(byAdding: .day, value: 1, to: current) ?? scanEnd.addingTimeInterval(1)
+        }
+
+        return fallback
     }
 
     private func jdToDate(_ jd: Double) -> Date {

@@ -9,9 +9,12 @@
 import Foundation
 
 public enum ObservationTime: Sendable {
-    case sunrise  // Default for 95% of festivals (Udaya Tithi)
-    case midnight // For Shivratri, Janmashtami (Nishita Kaal)
-    case sunset   // Optional: For Holika Dahan, Diwali Laxmi Puja
+    case sunrise    // Default for most festivals (Udaya Tithi)
+    case midnight   // For Shivratri, Janmashtami (Nishita Kaal)
+    case pradoshKaal // For Diwali Laxmi Puja, Holika Dahan — the tithi must prevail in
+                     // the first fifth of the night after sunset (Pradosh-vyapini)
+    case aparahna    // For Dussehra/Vijayadashami — the tithi must prevail in the third
+                     // of five equal divisions of daylight (Aparahna-vyapini)
 }
 
 // MARK: - Festival Entity
@@ -186,7 +189,8 @@ public let allFestivalRules: [FestivalRule] = [
         hasIcon: true
     ),
     FestivalRule(name: "Maha Navami",          emoji: "🪔", lunarMonth: 7,  tithiNumber: 24),
-    FestivalRule(name: "Dussehra",             emoji: "🏹", lunarMonth: 7,  tithiNumber: 25),
+    FestivalRule(name: "Dussehra",             emoji: "🏹", lunarMonth: 7,  tithiNumber: 25,
+                 observationTime: .aparahna),
     FestivalRule(name: "Sharad Purnima",       emoji: "🌝", lunarMonth: 7,  tithiNumber: 30),
 
     // ── Kartika (8) ── [KP = Diwali week] + [SP → Kartik Purnima] ────────────
@@ -205,7 +209,8 @@ public let allFestivalRules: [FestivalRule] = [
         emoji: "diwali",
         lunarMonth: 8,
         tithiNumber: 15,
-        hasIcon: true
+        hasIcon: true,
+        observationTime: .pradoshKaal
     ),
     FestivalRule(name: "Govardhan Puja",       emoji: "🐄", lunarMonth: 8,  tithiNumber: 16),
     FestivalRule(
@@ -253,7 +258,8 @@ public let allFestivalRules: [FestivalRule] = [
         hasIcon: true,
         observationTime: .midnight
     ),
-    FestivalRule(name: "Holika Dahan",         emoji: "🔥", lunarMonth: 12, tithiNumber: 29),
+    FestivalRule(name: "Holika Dahan",         emoji: "🔥", lunarMonth: 12, tithiNumber: 29,
+                 observationTime: .pradoshKaal),
     FestivalRule(
         name: "Holi",
         emoji: "holi",
