@@ -164,12 +164,18 @@ public struct PanchangDay: Sendable {
     public let horas: [HoraInfo]            // 24 Vedic planetary hours (12 day + 12 night, Chaldean order)
     public let lagnas: [LagnaPeriod]        // Rising sign (Ascendant) periods sunrise → next sunrise
 
+    /// The Vishti (Bhadra) karana window for the day, if one falls within it —
+    /// nil most days (Bhadra occurs on roughly 8 of every 30 tithis). Defaults
+    /// to nil so existing callers (previews, tests) don't need updating.
+    public let bhadraKaal: Muhurat?
+
     public init(date: Date, lunarMonth: String, lunarMonthNumber: Int, isAdhikMaas: Bool,
                 sunrise: Date, sunset: Date, moonrise: Date?, moonset: Date?,
                 tithi: Tithi, tithiNumber: Int, nakshatra: Nakshatra, yoga: MinorLimb, karana: MinorLimb,
                 vara: String, moonRashi: String, muhurats: [Muhurat], chaughariya: [Muhurat],
                 nightChaughariya: [Muhurat], planetPositions: [PlanetPosition],
-                vedaAyana: String, raviYoga: Bool, horas: [HoraInfo], lagnas: [LagnaPeriod]) {
+                vedaAyana: String, raviYoga: Bool, horas: [HoraInfo], lagnas: [LagnaPeriod],
+                bhadraKaal: Muhurat? = nil) {
         self.date = date
         self.lunarMonth = lunarMonth
         self.lunarMonthNumber = lunarMonthNumber
@@ -193,5 +199,6 @@ public struct PanchangDay: Sendable {
         self.raviYoga = raviYoga
         self.horas = horas
         self.lagnas = lagnas
+        self.bhadraKaal = bhadraKaal
     }
 }

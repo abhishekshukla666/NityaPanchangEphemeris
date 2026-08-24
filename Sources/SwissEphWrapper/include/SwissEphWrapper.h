@@ -51,6 +51,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (double)calculateYogaEndTimeForJulianDay:(double)startJD;
 - (int)calculateMoonRashiForJulianDay:(double)jd;
 
+- (int)calculateKaranaForJulianDay:(double)jd;
+- (double)calculateKaranaEndTimeForJulianDay:(double)startJD;
+
 /// Returns an array of 9 NSDictionary objects (one per Navagraha).
 /// Each dict has: planetIndex (0–8), longitude (0–360), rashiNumber (1–12), degreesInSign (0–30).
 - (NSArray<NSDictionary *> *)calculatePlanetPositionsForJulianDay:(double)jd;

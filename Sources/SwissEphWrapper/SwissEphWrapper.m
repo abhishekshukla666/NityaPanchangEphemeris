@@ -399,6 +399,35 @@ static void getAmantaMonthDetails(SwissEphWrapper *self, double jd, int *monthIn
     return searchJD;
 }
 
+// Karana (half-tithi, 1–60 per lunar month) — same Sun/Moon elongation used by
+// calculateTithiForDate:, just as a reusable per-instant primitive so a karana
+// boundary can be searched for independently of a tithi calculation.
+- (int)calculateKaranaForJulianDay:(double)jd {
+    swe_set_sid_mode(SE_SIDM_LAHIRI, 0, 0);
+    double sunPosition[6], moonPosition[6];
+    char errorMessage[256];
+    swe_calc_ut(jd, SE_SUN,  SEFLG_SWIEPH | SEFLG_SIDEREAL, sunPosition, errorMessage);
+    swe_calc_ut(jd, SE_MOON, SEFLG_SWIEPH | SEFLG_SIDEREAL, moonPosition, errorMessage);
+    double e = moonPosition[0] - sunPosition[0];
+    if (e < 0) e += 360.0;
+    return (int)(e / 6.0) + 1;
+}
+
+// A karana is half a tithi (~10–13h in practice), much shorter than a
+// nakshatra/yoga — capped well below their 1.5-day search window.
+- (double)calculateKaranaEndTimeForJulianDay:(double)startJD {
+    int startingKarana = [self calculateKaranaForJulianDay:startJD];
+    double step = 15.0 / (24.0 * 60.0);
+    double searchJD = startJD;
+    int searchKarana = startingKarana;
+    while (searchKarana == startingKarana) {
+        searchJD += step;
+        searchKarana = [self calculateKaranaForJulianDay:searchJD];
+        if (searchJD > startJD + 0.833) { break; }
+    }
+    return searchJD;
+}
+
 // MARK: - Navagraha (9 Planet) Positions
 
 - (NSArray<NSDictionary *> *)calculatePlanetPositionsForJulianDay:(double)jd {

@@ -243,6 +243,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                                    nextSunriseJD: nextSunriseJD, weekday: weekday)
         let lagnas = computeLagnas(sunriseJD: sunriseJD, sunsetJD: sunsetJD, nextSunriseJD: nextSunriseJD,
                                    latitude: latitude, longitude: longitude)
+        let bhadraKaal = computeBhadraKaal(sunriseJD: sunriseJD, nextSunriseJD: nextSunriseJD)
 
         return PanchangDay(
             date:              date,
@@ -269,8 +270,40 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             vedaAyana:         vedaAyana,
             raviYoga:          raviYoga,
             horas:             horas,
-            lagnas:            lagnas
+            lagnas:            lagnas,
+            bhadraKaal:        bhadraKaal
         )
+    }
+
+    /// Scans the calendar day (sunrise → next sunrise) for a Vishti (Bhadra)
+    /// karana window, the classically inauspicious half-tithi period most
+    /// commonly known for the Raksha Bandhan "don't tie during Bhadra" rule.
+    /// A karana already in progress at sunrise is walked backward to its true
+    /// start rather than clipped — a warning needs an accurate start time to
+    /// be useful, not just "some time before now."
+    private func computeBhadraKaal(sunriseJD: Double, nextSunriseJD: Double) -> Muhurat? {
+        let step: Double = 15.0 / 1440.0
+        var searchJD = sunriseJD
+
+        while searchJD < nextSunriseJD {
+            let karanaNum = Int(wrapper.calculateKarana(forJulianDay: searchJD))
+            let endJD = wrapper.calculateKaranaEndTime(forJulianDay: searchJD)
+            // Vishti sits at index 6 of the 7-karana movable cycle (numbers
+            // 2–57); the four fixed karanas (1, 58–60) never match this.
+            let isVishti = karanaNum >= 2 && karanaNum <= 57 && (karanaNum - 2) % 7 == 6
+
+            if isVishti {
+                var startJD = searchJD
+                while startJD - step >= sunriseJD - 0.833,
+                      Int(wrapper.calculateKarana(forJulianDay: startJD - step)) == karanaNum {
+                    startJD -= step
+                }
+                return Muhurat(name: "Bhadra Kaal", startTime: jdToDate(startJD),
+                               endTime: jdToDate(min(endJD, nextSunriseJD)), type: .inauspicious)
+            }
+            searchJD = endJD
+        }
+        return nil
     }
 
     // MARK: - Birth Chart (Guna Milan) — Moon nakshatra/pada/rashi + Mars + Lagna
