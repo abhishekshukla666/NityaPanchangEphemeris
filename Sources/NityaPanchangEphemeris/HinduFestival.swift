@@ -71,6 +71,7 @@ public struct FestivalRule: Sendable {
 public let allFestivalRules: [FestivalRule] = [
 
     // ── Chaitra (1) ── [KP after Phalguna Purnima] + [SP → Chaitra Purnima] ──
+    FestivalRule(name: "Sheetala Ashtami",     emoji: "🙏", lunarMonth: 1,  tithiNumber: 8),
     FestivalRule(name: "Ugadi",                emoji: "🪷", lunarMonth: 1,  tithiNumber: 16),
     FestivalRule(name: "Gudi Padwa",           emoji: "🌾", lunarMonth: 1,  tithiNumber: 16),
     FestivalRule(name: "Navratri (Chaitra)",   emoji: "🎊", lunarMonth: 1,  tithiNumber: 16),
@@ -147,6 +148,9 @@ public let allFestivalRules: [FestivalRule] = [
     ),
 
     // ── Bhadrapada (6) ── [KP after Shravana Purnima] + [SP → Bhadrapada Purnima]
+    FestivalRule(name: "Kajari Teej",          emoji: "🌿", lunarMonth: 6,  tithiNumber: 3),
+    FestivalRule(name: "Bahula Chaturthi",     emoji: "🐄", lunarMonth: 6,  tithiNumber: 4),
+    FestivalRule(name: "Hal Chhath",           emoji: "🐂", lunarMonth: 6,  tithiNumber: 6),
     FestivalRule(
         name: "Krishna Janmashtami",
         emoji: "krishna",
@@ -173,6 +177,7 @@ public let allFestivalRules: [FestivalRule] = [
     ),
 
     // ── Ashwina (7) ── [KP = Pitru Paksha] + [SP = Navratri → Sharad Purnima] ─
+    FestivalRule(name: "Jivitputrika Vrat",    emoji: "🙏", lunarMonth: 7,  tithiNumber: 8),
     FestivalRule(name: "Mahalaya Amavasya",    emoji: "🌚", lunarMonth: 7,  tithiNumber: 15),
     FestivalRule(
         name: "Navratri",
@@ -221,6 +226,7 @@ public let allFestivalRules: [FestivalRule] = [
         hasIcon: true
     ),
     FestivalRule(name: "Chhath Puja",          emoji: "☀️", lunarMonth: 8,  tithiNumber: 21),
+    FestivalRule(name: "Gopashtami",           emoji: "🐄", lunarMonth: 8,  tithiNumber: 23),
     FestivalRule(name: "Dev Uthani Ekadashi",  emoji: "🛕", lunarMonth: 8,  tithiNumber: 26),
     FestivalRule(name: "Tulsi Vivah",          emoji: "🌿", lunarMonth: 8,  tithiNumber: 27),
     FestivalRule(
@@ -247,6 +253,7 @@ public let allFestivalRules: [FestivalRule] = [
         tithiNumber: 20,
         hasIcon: true
     ),
+    FestivalRule(name: "Ratha Saptami",        emoji: "☀️", lunarMonth: 11, tithiNumber: 22),
     FestivalRule(name: "Magha Purnima",        emoji: "🌝", lunarMonth: 11, tithiNumber: 30),
 
     // ── Phalguna (12) ── [KP after Magha Purnima] + [SP → Holi] ─────────────
