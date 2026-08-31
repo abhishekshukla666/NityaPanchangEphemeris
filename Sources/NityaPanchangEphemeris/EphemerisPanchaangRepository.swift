@@ -119,6 +119,18 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 ? rawSunriseJD
                 : wrapper.getJulianDayUTC(from: current.addingTimeInterval(6 * 3600))
 
+            // Pradosh Kaal: first fifth of the night (sunset → next sunrise),
+            // sampled at its midpoint — same formula computeFestivals uses
+            // for Diwali/Maha Navami, but at the caller's own location since
+            // Pradosh Vrat is a personal observance, not a nationally-agreed
+            // date the way Diwali/Dussehra are.
+            let sunsetJD = sunData["sunsetJD"] as? Double ?? jdSunrise
+            let nextDayStart = cal.date(byAdding: .day, value: 1, to: current) ?? current
+            let nextSunData  = wrapper.calculateSunriseSunset(for: nextDayStart, latitude: latitude, longitude: longitude)
+            let nextSunriseJD = nextSunData["sunriseJD"] as? Double ?? (sunsetJD + 0.5)
+            let nightLen  = max(nextSunriseJD - sunsetJD, 1.0 / 1440.0)
+            let jdPradosh = sunsetJD + nightLen / 10.0
+
             results.append(DailyPanchangSummary(
                 date:            current,
                 tithiNumber:     Int(wrapper.calculateTithiNumber(forJulianDay: jdSunrise)),
@@ -126,7 +138,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 moonRashiNumber: Int(wrapper.calculateMoonRashi(forJulianDay: jdSunrise)),
                 vara:            PanchaangHelper.getVaraName(for: current),
                 lunarMonth:      Int(wrapper.calculatePurnimantaMonth(forJulianDay: jdSunrise)),
-                isAdhikMaas:     wrapper.calculateIsAdhikMaas(forJulianDay: jdSunrise)
+                isAdhikMaas:     wrapper.calculateIsAdhikMaas(forJulianDay: jdSunrise),
+                pradoshTithiNumber: Int(wrapper.calculateTithiNumber(forJulianDay: jdPradosh))
             ))
 
             current = cal.date(byAdding: .day, value: 1, to: current) ?? end.addingTimeInterval(1)
