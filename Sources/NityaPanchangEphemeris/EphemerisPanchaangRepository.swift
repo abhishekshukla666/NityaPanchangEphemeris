@@ -561,10 +561,11 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                         let sunriseRefJD = sunData["sunriseJD"] as? Double ?? jdSunrise
                         let sunsetRefJD  = sunData["sunsetJD"]  as? Double ?? (sunriseRefJD + 0.5)
 
-                        // Aparahna Kaal: the third of five equal divisions of daylight,
+                        // Aparahna Kaal: the fourth of five equal divisions of daylight
+                        // (Pratahkal, Sangava, Madhyahna, Aparahna, Sayahna — in that order),
                         // sampled at its midpoint.
                         let dayLen     = max(sunsetRefJD - sunriseRefJD, 1.0 / 1440.0)
-                        let jdAparahna = sunriseRefJD + dayLen * 2.5 / 5.0
+                        let jdAparahna = sunriseRefJD + dayLen * 3.5 / 5.0
                         cachedAparahnaTithi = Int(wrapper.calculateTithiNumber(forJulianDay: jdAparahna))
                         cachedAparahnaMonth = Int(wrapper.calculatePurnimantaMonth(forJulianDay: jdAparahna))
                         cachedAparahnaAdhik = wrapper.calculateIsAdhikMaas(forJulianDay: jdAparahna)
