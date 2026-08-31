@@ -262,31 +262,15 @@ static void getAmantaMonthDetails(SwissEphWrapper *self, double jd, int *monthIn
     return currentIsAdhik;
 }
 
-/// Amanta: month = Sun's rashi at the Purnima within the current Amanta month.
-/// Shukla Paksha (moon waxing, elongation < 180°): use the NEXT (upcoming) Purnima.
-/// Krishna Paksha (moon waning, elongation ≥ 180°): use the PREVIOUS (last) Purnima.
-//- (int)calculateAmantaMonthForJulianDay:(double)jd {
-//    swe_set_sid_mode(SE_SIDM_LAHIRI, 0, 0);
-//    char errorMessage[256];
-//    double sunPos[6], moonPos[6];
-//    if (swe_calc_ut(jd, SE_SUN,  SEFLG_SWIEPH | SEFLG_SIDEREAL, sunPos,  errorMessage) < 0) return 0;
-//    if (swe_calc_ut(jd, SE_MOON, SEFLG_SWIEPH | SEFLG_SIDEREAL, moonPos, errorMessage) < 0) return 0;
-//    double elongation = moonPos[0] - sunPos[0];
-//    if (elongation < 0) elongation += 360.0;
-//    double purnimaJD;
-//    if (elongation < 180.0) {
-//        // Shukla Paksha: find the upcoming Purnima.
-//        double daysAhead = (180.0 - elongation) * 29.53059 / 360.0;
-//        purnimaJD = refinePurnimaJD(self, jd + daysAhead);
-//    } else {
-//        // Krishna Paksha: find the most recent Purnima (same as Purnimanta).
-//        double daysSince = (elongation - 180.0) * 29.53059 / 360.0;
-//        purnimaJD = refinePurnimaJD(self, jd - daysSince);
-//    }
-//    if (swe_calc_ut(purnimaJD, SE_SUN, SEFLG_SWIEPH | SEFLG_SIDEREAL, sunPos, errorMessage) < 0) return 0;
-//    int rashi = (int)(sunPos[0] / 30.0);
-//    return ((rashi + 1) % 12) + 1;
-//}
+/// Amanta month — a thin wrapper over the same source-of-truth helper
+/// Purnimanta and the Amanta Adhik flag already call, so all three can never
+/// disagree with each other.
+- (int)calculateAmantaMonthForJulianDay:(double)jd {
+    int month;
+    BOOL isAdhik;
+    getAmantaMonthDetails(self, jd, &month, &isAdhik);
+    return month;
+}
 
 - (double)getJulianDayUTCFromDate:(NSDate *)date {
     NSCalendar *calendar = [[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian];

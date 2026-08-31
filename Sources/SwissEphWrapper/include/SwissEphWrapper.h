@@ -27,9 +27,11 @@ NS_ASSUME_NONNULL_BEGIN
 /// The upcoming Purnima always closes the current Purnimanta month, regardless of paksha.
 - (int)calculatePurnimantaMonthForJulianDay:(double)jd;
 
-/// Amanta month: Sun's rashi at the Purnima within the current Amanta month → 1–12.
-/// For Shukla Paksha this is the upcoming Purnima; for Krishna Paksha it is the last one.
-//- (int)calculateAmantaMonthForJulianDay:(double)jd;
+/// Amanta month → 1–12. A thin wrapper over the same Amavasya-boundary source
+/// of truth calculatePurnimantaMonthForJulianDay: and
+/// calculateIsAdhikMaasForJulianDay: already use, so all three can never
+/// disagree with each other.
+- (int)calculateAmantaMonthForJulianDay:(double)jd;
 
 /// Amanta Adhik Maas: no Sankranti between the two Amavasyas bracketing the current date.
 /// Use this for Amanta and Solar calendar display.

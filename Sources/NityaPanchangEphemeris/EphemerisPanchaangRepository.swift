@@ -175,6 +175,13 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
 
         let monthName = PanchaangHelper.getLunarMonthName(Int(monthNum), isAdhik: isAdhik)
 
+        // Amanta — display-only parallel to the Purnimanta name above. Every
+        // internal rule (festivals, Ekadashi, Samvat) keeps matching against
+        // the Purnimanta month/tithi computed above regardless of this value.
+        let isAdhikAmanta   = wrapper.calculateIsAdhikMaas(forJulianDay: refJD)
+        let amantaMonthNum  = wrapper.calculateAmantaMonth(forJulianDay: refJD)
+        let amantaMonthName = PanchaangHelper.getLunarMonthName(Int(amantaMonthNum), isAdhik: isAdhikAmanta)
+
         let weekday = Calendar.current.component(.weekday, from: dayStart)
         let mData   = wrapper.calculateMuhurats(withSunrise: sunriseJD, sunset: sunsetJD, weekday: Int32(weekday))
 
@@ -271,7 +278,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             raviYoga:          raviYoga,
             horas:             horas,
             lagnas:            lagnas,
-            bhadraKaal:        bhadraKaal
+            bhadraKaal:        bhadraKaal,
+            amantaMonth:       amantaMonthName
         )
     }
 

@@ -169,13 +169,20 @@ public struct PanchangDay: Sendable {
     /// to nil so existing callers (previews, tests) don't need updating.
     public let bhadraKaal: Muhurat?
 
+    /// The Amanta (South Indian) name for this same day — a display-only
+    /// parallel to `lunarMonth`. All internal matching (festivals, Ekadashi,
+    /// Samvat) stays Purnimanta-only regardless of which is shown to the
+    /// user. Defaults to "" so existing callers (previews, tests) don't need
+    /// updating.
+    public let amantaMonth: String
+
     public init(date: Date, lunarMonth: String, lunarMonthNumber: Int, isAdhikMaas: Bool,
                 sunrise: Date, sunset: Date, moonrise: Date?, moonset: Date?,
                 tithi: Tithi, tithiNumber: Int, nakshatra: Nakshatra, yoga: MinorLimb, karana: MinorLimb,
                 vara: String, moonRashi: String, muhurats: [Muhurat], chaughariya: [Muhurat],
                 nightChaughariya: [Muhurat], planetPositions: [PlanetPosition],
                 vedaAyana: String, raviYoga: Bool, horas: [HoraInfo], lagnas: [LagnaPeriod],
-                bhadraKaal: Muhurat? = nil) {
+                bhadraKaal: Muhurat? = nil, amantaMonth: String = "") {
         self.date = date
         self.lunarMonth = lunarMonth
         self.lunarMonthNumber = lunarMonthNumber
@@ -200,5 +207,6 @@ public struct PanchangDay: Sendable {
         self.horas = horas
         self.lagnas = lagnas
         self.bhadraKaal = bhadraKaal
+        self.amantaMonth = amantaMonth
     }
 }
