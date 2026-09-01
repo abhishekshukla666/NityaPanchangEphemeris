@@ -193,8 +193,7 @@ public let allFestivalRules: [FestivalRule] = [
         tithiNumber: 23,
         hasIcon: true
     ),
-    FestivalRule(name: "Maha Navami",          emoji: "🪔", lunarMonth: 7,  tithiNumber: 24,
-                 observationTime: .pradoshKaal),
+    FestivalRule(name: "Maha Navami",          emoji: "🪔", lunarMonth: 7,  tithiNumber: 24),
     FestivalRule(name: "Dussehra",             emoji: "🏹", lunarMonth: 7,  tithiNumber: 25,
                  observationTime: .aparahna),
     FestivalRule(name: "Sharad Purnima",       emoji: "🌝", lunarMonth: 7,  tithiNumber: 30),
