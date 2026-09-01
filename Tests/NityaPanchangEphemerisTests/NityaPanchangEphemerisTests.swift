@@ -217,4 +217,30 @@ final class NityaPanchangEphemerisTests: XCTestCase {
             }
         }
     }
+
+    /// 6 Feb 2020 (Ujjain): raw dusk readings jump 27 -> 29 with no sunset
+    /// ever reading 28 in between — Shukla Trayodashi is genuinely kshaya
+    /// that lunar month, found by an independent day-by-day scan of the raw
+    /// (uncorrected) dusk tithi across 2020-2035. Without the kshaya
+    /// correction, Pradosh Vrat would silently vanish from the calendar and
+    /// day-detail badge that month, the same way Ekadashi used to vanish
+    /// from Quick Lookup.
+    func testFetchMonthTithisCorrectsKshayaPradosh() async throws {
+        let repository: PanchaangRepository = EphemerisPanchaangRepository()
+        let tithis = await repository.fetchMonthTithis(year: 2020, month: 2, latitude: latitude, longitude: longitude)
+
+        let day6 = try XCTUnwrap(tithis[6])
+        XCTAssertEqual(day6.pradoshTithi, 28, "6 Feb 2020 should be corrected to show the lost Trayodashi")
+    }
+
+    /// Same kshaya day as above, via the single-day fetchPanchang path
+    /// (dashboard hero pill / day-detail badge) rather than the month scan.
+    func testFetchPanchangCorrectsKshayaPradosh() async throws {
+        let repository: PanchaangRepository = EphemerisPanchaangRepository()
+        let date = DateComponents(calendar: .init(identifier: .gregorian),
+                                   timeZone: TimeZone(identifier: "Asia/Kolkata"),
+                                   year: 2020, month: 2, day: 6, hour: 12).date!
+        let panchang = await repository.fetchPanchang(for: date, latitude: latitude, longitude: longitude)
+        XCTAssertEqual(panchang.pradoshTithiNumber, 28, "6 Feb 2020 should be corrected to show the lost Trayodashi")
+    }
 }
