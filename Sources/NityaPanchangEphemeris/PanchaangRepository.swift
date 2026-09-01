@@ -13,7 +13,7 @@ public protocol PanchaangRepository: Sendable {
     func fetchPanchang(for date: Date, latitude: Double, longitude: Double) async -> PanchangDay
 
     /// Tithi number (1–30) for every day of a calendar month, evaluated at local sunrise.
-    func fetchMonthTithis(year: Int, month: Int, latitude: Double, longitude: Double) async -> [Int: Int]
+    func fetchMonthTithis(year: Int, month: Int, latitude: Double, longitude: Double) async -> [Int: MonthDayTithis]
 
     /// All festivals whose Panchang-derived date falls between startDate and endDate.
     func fetchFestivals(from startDate: Date, to endDate: Date) async -> [HinduFestival]

@@ -58,7 +58,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         }
     }
 
-    public func fetchMonthTithis(year: Int, month: Int, latitude: Double, longitude: Double) async -> [Int: Int] {
+    public func fetchMonthTithis(year: Int, month: Int, latitude: Double, longitude: Double) async -> [Int: MonthDayTithis] {
         await withCheckedContinuation { continuation in
             queue.async { [self] in
                 continuation.resume(returning: computeMonthTithis(year: year, month: month,
@@ -265,6 +265,13 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                                    latitude: latitude, longitude: longitude)
         let bhadraKaal = computeBhadraKaal(sunriseJD: sunriseJD, nextSunriseJD: nextSunriseJD)
 
+        // Pradosh Kaal tithi — first fifth of the night after sunset, at its
+        // midpoint. Placed here to reuse nextSunriseJD above: Trayodashi is
+        // dated by dusk rather than sunrise, so the Pradosh Vrat badge
+        // cannot read tithiNumber.
+        let pradoshTithi = Int(wrapper.calculateTithiNumber(
+            forJulianDay: sunsetJD + max(nextSunriseJD - sunsetJD, 1.0 / 1440.0) / 10.0))
+
         return PanchangDay(
             date:              date,
             lunarMonth:        monthName,
@@ -292,7 +299,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             horas:             horas,
             lagnas:            lagnas,
             bhadraKaal:        bhadraKaal,
-            amantaMonth:       amantaMonthName
+            amantaMonth:       amantaMonthName,
+            pradoshTithiNumber: pradoshTithi
         )
     }
 
@@ -453,21 +461,45 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         return (lo + hi) / 2.0
     }
 
-    // Tithi is evaluated at local sunrise — matching the dashboard's computePanchang logic.
-    // Using midnight UTC caused mismatches in IST (+5:30) where 00:00 IST = 18:30 UTC (previous day).
-    private func computeMonthTithis(year: Int, month: Int, latitude: Double, longitude: Double) -> [Int: Int] {
+    // Sunrise tithi is evaluated at local sunrise — matching the dashboard's
+    // computePanchang logic. Using midnight UTC caused mismatches in IST
+    // (+5:30) where 00:00 IST = 18:30 UTC (previous day).
+    //
+    // Pradosh Kaal tithi is also computed here (same formula the festival
+    // rules and computePanchang use): Pradosh Vrat is dated by dusk, not
+    // sunrise, so the calendar's trident cannot be derived from the sunrise
+    // reading alone. Sunrise and sunset are gathered once for the whole
+    // month plus the following day rather than per-day: Pradosh Kaal needs
+    // the next day's sunrise to close the night, and fetching that
+    // separately would double the ephemeris calls for a scan the calendar
+    // runs on every month change.
+    private func computeMonthTithis(year: Int, month: Int, latitude: Double, longitude: Double) -> [Int: MonthDayTithis] {
         let cal = Calendar.current
-        var comps = DateComponents(year: year, month: month, day: 1)
+        let comps = DateComponents(year: year, month: month, day: 1)
         guard let first = cal.date(from: comps),
               let count = cal.range(of: .day, in: .month, for: first)?.count else { return [:] }
-        var results: [Int: Int] = [:]
-        for day in 1...count {
-            comps.day = day
-            guard let date = cal.date(from: comps) else { continue }
+
+        // Index 0 unused; 1...count+1 populated (day count+1 = the 1st of
+        // the following month, needed to close the last day's night).
+        var sunrises = [Double](repeating: 0, count: count + 2)
+        var sunsets  = [Double](repeating: 0, count: count + 2)
+        for day in 1...(count + 1) {
+            guard let date = cal.date(byAdding: .day, value: day - 1, to: first) else { continue }
+            let jd        = wrapper.getJulianDayUTC(from: date)
             let sunData   = wrapper.calculateSunriseSunset(for: date, latitude: latitude, longitude: longitude)
             let sunriseJD = sunData["sunriseJD"] as? Double ?? 0
-            let refJD     = sunriseJD > 2_400_000 ? sunriseJD : wrapper.getJulianDayUTC(from: date)
-            results[day]  = Int(wrapper.calculateTithiNumber(forJulianDay: refJD))
+            let sunsetJD  = sunData["sunsetJD"]  as? Double ?? 0
+            sunrises[day] = sunriseJD > 2_400_000 ? sunriseJD : jd
+            sunsets[day]  = sunsetJD  > 2_400_000 ? sunsetJD  : jd + 0.5
+        }
+
+        var results: [Int: MonthDayTithis] = [:]
+        for day in 1...count {
+            let nightLen = max(sunrises[day + 1] - sunsets[day], 1.0 / 1440.0)
+            results[day] = MonthDayTithis(
+                sunriseTithi: Int(wrapper.calculateTithiNumber(forJulianDay: sunrises[day])),
+                pradoshTithi: Int(wrapper.calculateTithiNumber(forJulianDay: sunsets[day] + nightLen / 10.0))
+            )
         }
         return results
     }

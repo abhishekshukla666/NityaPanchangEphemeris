@@ -49,9 +49,26 @@ final class NityaPanchangEphemerisTests: XCTestCase {
         let tithis = await repository.fetchMonthTithis(year: 2026, month: 2, latitude: latitude, longitude: longitude)
 
         XCTAssertEqual(tithis.count, 28, "February 2026 has 28 days")
-        for (_, tithi) in tithis {
-            XCTAssertTrue((1...30).contains(tithi))
+        for (_, dayTithis) in tithis {
+            XCTAssertTrue((1...30).contains(dayTithis.sunriseTithi))
+            XCTAssertTrue((1...30).contains(dayTithis.pradoshTithi))
         }
+    }
+
+    /// Regression test for the calendar's own Pradosh Vrat dating. Ashwin
+    /// Shukla Trayodashi 2026 runs 23 Oct 2:35pm - 24 Oct 1:36pm IST: dusk
+    /// falls inside that window on the 23rd, not the 24th, so the sunrise
+    /// tithi (still Dwadashi at dawn on the 23rd) must not be what the
+    /// calendar's trident badge reads.
+    func testFetchMonthTithisDatesPradoshVratByDusk() async throws {
+        let repository: PanchaangRepository = EphemerisPanchaangRepository()
+        let tithis = await repository.fetchMonthTithis(year: 2026, month: 10, latitude: latitude, longitude: longitude)
+
+        let day23 = try XCTUnwrap(tithis[23])
+        XCTAssertEqual(day23.pradoshTithi, 28, "23 Oct 2026 should read Trayodashi at Pradosh Kaal")
+
+        let day24 = try XCTUnwrap(tithis[24])
+        XCTAssertNotEqual(day24.pradoshTithi, 28, "24 Oct 2026 should not also read Trayodashi at Pradosh Kaal")
     }
 
     func testFetchFestivalsFindsDiwali() async throws {

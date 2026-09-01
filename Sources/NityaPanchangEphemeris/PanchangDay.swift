@@ -176,13 +176,20 @@ public struct PanchangDay: Sendable {
     /// updating.
     public let amantaMonth: String
 
+    /// Tithi at Pradosh Kaal — the first fifth of the night after sunset, at
+    /// its midpoint. Trayodashi (13/28, Pradosh Vrat) is dated by dusk
+    /// rather than sunrise, so any Pradosh check must read this and not
+    /// `tithiNumber`. Defaults to 0 so existing callers (previews, tests)
+    /// don't need updating.
+    public let pradoshTithiNumber: Int
+
     public init(date: Date, lunarMonth: String, lunarMonthNumber: Int, isAdhikMaas: Bool,
                 sunrise: Date, sunset: Date, moonrise: Date?, moonset: Date?,
                 tithi: Tithi, tithiNumber: Int, nakshatra: Nakshatra, yoga: MinorLimb, karana: MinorLimb,
                 vara: String, moonRashi: String, muhurats: [Muhurat], chaughariya: [Muhurat],
                 nightChaughariya: [Muhurat], planetPositions: [PlanetPosition],
                 vedaAyana: String, raviYoga: Bool, horas: [HoraInfo], lagnas: [LagnaPeriod],
-                bhadraKaal: Muhurat? = nil, amantaMonth: String = "") {
+                bhadraKaal: Muhurat? = nil, amantaMonth: String = "", pradoshTithiNumber: Int = 0) {
         self.date = date
         self.lunarMonth = lunarMonth
         self.lunarMonthNumber = lunarMonthNumber
@@ -208,5 +215,22 @@ public struct PanchangDay: Sendable {
         self.lagnas = lagnas
         self.bhadraKaal = bhadraKaal
         self.amantaMonth = amantaMonth
+        self.pradoshTithiNumber = pradoshTithiNumber
+    }
+}
+
+/// The two tithi readings a calendar cell needs for one day.
+///
+/// Most markers are Udaya Tithi observances and read `sunriseTithi`;
+/// Pradosh Vrat is dated by dusk and reads `pradoshTithi`. Carrying both
+/// avoids a second scan of the month, and avoids the calendar and the Quick
+/// Lookup section disagreeing about the same day.
+public struct MonthDayTithis: Sendable {
+    public let sunriseTithi: Int
+    public let pradoshTithi: Int
+
+    public init(sunriseTithi: Int, pradoshTithi: Int) {
+        self.sunriseTithi = sunriseTithi
+        self.pradoshTithi = pradoshTithi
     }
 }
