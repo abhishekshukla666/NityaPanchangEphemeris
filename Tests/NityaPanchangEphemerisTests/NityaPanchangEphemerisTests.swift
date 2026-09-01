@@ -163,4 +163,41 @@ final class NityaPanchangEphemerisTests: XCTestCase {
 
         XCTAssertNil(solarOn12Aug, "12 Aug 2026 solar eclipse is not visible from Ujjain but was returned")
     }
+
+    /// Holika Dahan/Holi cannot be expressed as "a tithi prevails at an
+    /// instant" — the bonfire is lit at Purnima Pradosh unless Bhadra runs
+    /// past midnight, in which case it (and Holi, the day after) defer by a
+    /// day. These four years are the published reference: 2024/2025 land on
+    /// the Purnima day itself, 2023/2026 defer past it.
+    func testHolikaDahanAndHoliMatchThePublishedDates() async throws {
+        let repository: PanchaangRepository = EphemerisPanchaangRepository()
+        let cal = Calendar(identifier: .gregorian)
+
+        let expected: [Int: (dahan: (Int, Int), holi: (Int, Int))] = [
+            2023: ((3, 7),  (3, 8)),
+            2024: ((3, 24), (3, 25)),
+            2025: ((3, 13), (3, 14)),
+            2026: ((3, 3),  (3, 4)),
+        ]
+
+        for (year, dates) in expected {
+            let start = DateComponents(calendar: cal, year: year, month: 1, day: 1).date!
+            let end   = DateComponents(calendar: cal, year: year, month: 12, day: 31).date!
+            let festivals = await repository.fetchFestivals(from: start, to: end)
+
+            let dahan = festivals.first { $0.name == "Holika Dahan" }
+            let holi  = festivals.first { $0.name == "Holi" }
+            XCTAssertNotNil(dahan, "\(year): no Holika Dahan found")
+            XCTAssertNotNil(holi,  "\(year): no Holi found")
+
+            if let dahan {
+                XCTAssertEqual(cal.component(.month, from: dahan.date), dates.dahan.0, "\(year) Holika Dahan month")
+                XCTAssertEqual(cal.component(.day,   from: dahan.date), dates.dahan.1, "\(year) Holika Dahan day")
+            }
+            if let holi {
+                XCTAssertEqual(cal.component(.month, from: holi.date), dates.holi.0, "\(year) Holi month")
+                XCTAssertEqual(cal.component(.day,   from: holi.date), dates.holi.1, "\(year) Holi day")
+            }
+        }
+    }
 }

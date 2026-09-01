@@ -11,9 +11,9 @@ import Foundation
 public enum ObservationTime: Sendable {
     case sunrise    // Default for most festivals (Udaya Tithi)
     case midnight   // For Shivratri, Janmashtami (Nishita Kaal)
-    case pradoshKaal // For Diwali Laxmi Puja, Holika Dahan — the tithi must prevail in
-                     // the first fifth of the night after sunset (Pradosh-vyapini)
-    case aparahna    // For Dussehra/Vijayadashami — the tithi must prevail in the third
+    case pradoshKaal // For Diwali Laxmi Puja — the tithi must prevail in the first
+                     // fifth of the night after sunset (Pradosh-vyapini)
+    case aparahna    // For Dussehra/Vijayadashami — the tithi must prevail in the fourth
                      // of five equal divisions of daylight (Aparahna-vyapini)
 }
 
@@ -266,15 +266,11 @@ public let allFestivalRules: [FestivalRule] = [
         hasIcon: true,
         observationTime: .midnight
     ),
-    FestivalRule(name: "Holika Dahan",         emoji: "🔥", lunarMonth: 12, tithiNumber: 29,
-                 observationTime: .aparahna),
-    FestivalRule(
-        name: "Holi",
-        emoji: "holi",
-        lunarMonth: 12,
-        tithiNumber: 30,
-        hasIcon: true
-    ),
+    // Holika Dahan and Holi are NOT in this table. Neither can be expressed
+    // as "a tithi prevails at an instant": Holika Dahan is the Purnima
+    // Pradosh unless Bhadra runs past midnight, in which case it defers a
+    // day, and Holi is simply the day after whichever day that lands on.
+    // See EphemerisPanchaangRepository.holiFestivals.
 
     // MARK: - The 24 Ekadashis
 
