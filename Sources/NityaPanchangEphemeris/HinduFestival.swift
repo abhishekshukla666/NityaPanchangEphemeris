@@ -267,7 +267,7 @@ public let allFestivalRules: [FestivalRule] = [
         observationTime: .midnight
     ),
     FestivalRule(name: "Holika Dahan",         emoji: "🔥", lunarMonth: 12, tithiNumber: 29,
-                 observationTime: .pradoshKaal),
+                 observationTime: .aparahna),
     FestivalRule(
         name: "Holi",
         emoji: "holi",
