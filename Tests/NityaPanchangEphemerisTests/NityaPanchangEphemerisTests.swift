@@ -51,24 +51,7 @@ final class NityaPanchangEphemerisTests: XCTestCase {
         XCTAssertEqual(tithis.count, 28, "February 2026 has 28 days")
         for (_, dayTithis) in tithis {
             XCTAssertTrue((1...30).contains(dayTithis.sunriseTithi))
-            XCTAssertTrue((1...30).contains(dayTithis.pradoshTithi))
         }
-    }
-
-    /// Regression test for the calendar's own Pradosh Vrat dating. Ashwin
-    /// Shukla Trayodashi 2026 runs 23 Oct 2:35pm - 24 Oct 1:36pm IST: dusk
-    /// falls inside that window on the 23rd, not the 24th, so the sunrise
-    /// tithi (still Dwadashi at dawn on the 23rd) must not be what the
-    /// calendar's trident badge reads.
-    func testFetchMonthTithisDatesPradoshVratByDusk() async throws {
-        let repository: PanchaangRepository = EphemerisPanchaangRepository()
-        let tithis = await repository.fetchMonthTithis(year: 2026, month: 10, latitude: latitude, longitude: longitude)
-
-        let day23 = try XCTUnwrap(tithis[23])
-        XCTAssertEqual(day23.pradoshTithi, 28, "23 Oct 2026 should read Trayodashi at Pradosh Kaal")
-
-        let day24 = try XCTUnwrap(tithis[24])
-        XCTAssertNotEqual(day24.pradoshTithi, 28, "24 Oct 2026 should not also read Trayodashi at Pradosh Kaal")
     }
 
     func testFetchFestivalsFindsDiwali() async throws {
@@ -218,29 +201,51 @@ final class NityaPanchangEphemerisTests: XCTestCase {
         }
     }
 
-    /// 6 Feb 2020 (Ujjain): raw dusk readings jump 27 -> 29 with no sunset
-    /// ever reading 28 in between — Shukla Trayodashi is genuinely kshaya
-    /// that lunar month, found by an independent day-by-day scan of the raw
-    /// (uncorrected) dusk tithi across 2020-2035. Without the kshaya
-    /// correction, Pradosh Vrat would silently vanish from the calendar and
-    /// day-detail badge that month, the same way Ekadashi used to vanish
-    /// from Quick Lookup.
-    func testFetchMonthTithisCorrectsKshayaPradosh() async throws {
+    /// Regression test for the calendar's own Pradosh Vrat dating. Ashwin
+    /// Shukla Trayodashi 2026 runs 23 Oct 2:35pm - 24 Oct 1:36pm IST: it
+    /// overlaps the 23rd's Pradosh Kaal window far more than the 24th's, so
+    /// the vrat belongs to the 23rd, not the sunrise-tithi day (24th).
+    func testFetchMonthTithisDatesPradoshVratByOverlap() async throws {
         let repository: PanchaangRepository = EphemerisPanchaangRepository()
-        let tithis = await repository.fetchMonthTithis(year: 2020, month: 2, latitude: latitude, longitude: longitude)
+        let tithis = await repository.fetchMonthTithis(year: 2026, month: 10, latitude: latitude, longitude: longitude)
 
-        let day6 = try XCTUnwrap(tithis[6])
-        XCTAssertEqual(day6.pradoshTithi, 28, "6 Feb 2020 should be corrected to show the lost Trayodashi")
+        XCTAssertEqual(try XCTUnwrap(tithis[23]).isPradoshVrat, true, "23 Oct 2026 should be Pradosh Vrat")
+        XCTAssertEqual(try XCTUnwrap(tithis[24]).isPradoshVrat, false, "24 Oct 2026 should not also be Pradosh Vrat")
     }
 
-    /// Same kshaya day as above, via the single-day fetchPanchang path
-    /// (dashboard hero pill / day-detail badge) rather than the month scan.
-    func testFetchPanchangCorrectsKshayaPradosh() async throws {
+    /// Reported: no Pradosh Vrat on 1 Mar 2026. Not a kshaya case — Trayodashi
+    /// genuinely runs 28 Feb 20:44 - 1 Mar 19:10 (Ujjain), but a single
+    /// midpoint sample of each day's Pradosh Kaal window landed at 19:44,
+    /// after Trayodashi had already ended, so neither day's old point-sample
+    /// matched. By overlap, 1 Mar's window (18:30-20:58) holds Trayodashi's
+    /// first ~40 minutes against 28 Feb's ~13, so the vrat belongs to 1 Mar.
+    func testFetchMonthTithisResolvesOverlapMiss() async throws {
+        let repository: PanchaangRepository = EphemerisPanchaangRepository()
+        let march = await repository.fetchMonthTithis(year: 2026, month: 3, latitude: latitude, longitude: longitude)
+        let feb   = await repository.fetchMonthTithis(year: 2026, month: 2, latitude: latitude, longitude: longitude)
+
+        XCTAssertEqual(try XCTUnwrap(march[1]).isPradoshVrat, true, "1 Mar 2026 should be Pradosh Vrat")
+        XCTAssertEqual(try XCTUnwrap(feb[28]).isPradoshVrat, false, "28 Feb 2026 should not also be Pradosh Vrat")
+    }
+
+    /// Same 1 Mar 2026 case via the single-day fetchPanchang path (dashboard
+    /// hero pill / day-detail badge) rather than the month scan.
+    func testFetchPanchangResolvesOverlapMiss() async throws {
         let repository: PanchaangRepository = EphemerisPanchaangRepository()
         let date = DateComponents(calendar: .init(identifier: .gregorian),
                                    timeZone: TimeZone(identifier: "Asia/Kolkata"),
-                                   year: 2020, month: 2, day: 6, hour: 12).date!
+                                   year: 2026, month: 3, day: 1, hour: 12).date!
         let panchang = await repository.fetchPanchang(for: date, latitude: latitude, longitude: longitude)
-        XCTAssertEqual(panchang.pradoshTithiNumber, 28, "6 Feb 2020 should be corrected to show the lost Trayodashi")
+        XCTAssertTrue(panchang.isPradoshVrat, "1 Mar 2026 should be Pradosh Vrat")
+    }
+
+    /// 6 Feb 2020: the case the earlier (now-superseded) point-sample kshaya
+    /// fix was built to handle. The overlap test resolves it too, without
+    /// any special-casing — a genuine kshaya tithi cannot reach zero overlap
+    /// with both neighbouring Pradosh windows.
+    func testFetchMonthTithisResolvesFormerKshayaCase() async throws {
+        let repository: PanchaangRepository = EphemerisPanchaangRepository()
+        let tithis = await repository.fetchMonthTithis(year: 2020, month: 2, latitude: latitude, longitude: longitude)
+        XCTAssertEqual(try XCTUnwrap(tithis[6]).isPradoshVrat, true, "6 Feb 2020 should be Pradosh Vrat")
     }
 }

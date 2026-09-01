@@ -176,12 +176,15 @@ public struct PanchangDay: Sendable {
     /// updating.
     public let amantaMonth: String
 
-    /// Tithi at Pradosh Kaal — the first fifth of the night after sunset, at
-    /// its midpoint. Trayodashi (13/28, Pradosh Vrat) is dated by dusk
-    /// rather than sunrise, so any Pradosh check must read this and not
-    /// `tithiNumber`. Defaults to 0 so existing callers (previews, tests)
-    /// don't need updating.
-    public let pradoshTithiNumber: Int
+    /// Whether Pradosh Vrat is kept on this day.
+    ///
+    /// Decided by how much Trayodashi falls inside each day's Pradosh Kaal
+    /// window rather than by a tithi read at one instant, because the vrat
+    /// is dated by the tithi *prevailing during* dusk. A Trayodashi usually
+    /// touches two consecutive windows and belongs to whichever holds more
+    /// of it. Defaults to false so existing callers (previews, tests) don't
+    /// need updating.
+    public let isPradoshVrat: Bool
 
     public init(date: Date, lunarMonth: String, lunarMonthNumber: Int, isAdhikMaas: Bool,
                 sunrise: Date, sunset: Date, moonrise: Date?, moonset: Date?,
@@ -189,7 +192,7 @@ public struct PanchangDay: Sendable {
                 vara: String, moonRashi: String, muhurats: [Muhurat], chaughariya: [Muhurat],
                 nightChaughariya: [Muhurat], planetPositions: [PlanetPosition],
                 vedaAyana: String, raviYoga: Bool, horas: [HoraInfo], lagnas: [LagnaPeriod],
-                bhadraKaal: Muhurat? = nil, amantaMonth: String = "", pradoshTithiNumber: Int = 0) {
+                bhadraKaal: Muhurat? = nil, amantaMonth: String = "", isPradoshVrat: Bool = false) {
         self.date = date
         self.lunarMonth = lunarMonth
         self.lunarMonthNumber = lunarMonthNumber
@@ -215,22 +218,29 @@ public struct PanchangDay: Sendable {
         self.lagnas = lagnas
         self.bhadraKaal = bhadraKaal
         self.amantaMonth = amantaMonth
-        self.pradoshTithiNumber = pradoshTithiNumber
+        self.isPradoshVrat = isPradoshVrat
     }
 }
 
-/// The two tithi readings a calendar cell needs for one day.
+/// What a calendar cell needs for one day.
 ///
 /// Most markers are Udaya Tithi observances and read `sunriseTithi`;
-/// Pradosh Vrat is dated by dusk and reads `pradoshTithi`. Carrying both
+/// Pradosh Vrat is dated by dusk and reads `isPradoshVrat`. Carrying both
 /// avoids a second scan of the month, and avoids the calendar and the Quick
 /// Lookup section disagreeing about the same day.
 public struct MonthDayTithis: Sendable {
     public let sunriseTithi: Int
-    public let pradoshTithi: Int
+    /// Whether Pradosh Vrat is kept on this day.
+    ///
+    /// Decided by how much Trayodashi falls inside each day's Pradosh Kaal
+    /// window rather than by a tithi read at one instant, because the vrat
+    /// is dated by the tithi *prevailing during* dusk. A Trayodashi usually
+    /// touches two consecutive windows and belongs to whichever holds more
+    /// of it.
+    public let isPradoshVrat: Bool
 
-    public init(sunriseTithi: Int, pradoshTithi: Int) {
+    public init(sunriseTithi: Int, isPradoshVrat: Bool) {
         self.sunriseTithi = sunriseTithi
-        self.pradoshTithi = pradoshTithi
+        self.isPradoshVrat = isPradoshVrat
     }
 }

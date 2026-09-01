@@ -119,17 +119,18 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 ? rawSunriseJD
                 : wrapper.getJulianDayUTC(from: current.addingTimeInterval(6 * 3600))
 
-            // Pradosh Kaal: first fifth of the night (sunset → next sunrise),
-            // sampled at its midpoint — same formula computeFestivals uses
-            // for Diwali/Maha Navami, but at the caller's own location since
-            // Pradosh Vrat is a personal observance, not a nationally-agreed
-            // date the way Diwali/Dussehra are.
-            let sunsetJD = sunData["sunsetJD"] as? Double ?? jdSunrise
-            let nextDayStart = cal.date(byAdding: .day, value: 1, to: current) ?? current
-            let nextSunData  = wrapper.calculateSunriseSunset(for: nextDayStart, latitude: latitude, longitude: longitude)
-            let nextSunriseJD = nextSunData["sunriseJD"] as? Double ?? (sunsetJD + 0.5)
-            let nightLen  = max(nextSunriseJD - sunsetJD, 1.0 / 1440.0)
-            let jdPradosh = sunsetJD + nightLen / 10.0
+            // Pradosh Vrat, decided at the caller's own location rather than
+            // the fixed Ujjain reference the festival rules use: a vrat is
+            // kept where the observer is. The two neighbouring days are
+            // only fetched when today actually holds some Trayodashi.
+            let jdDayStart = wrapper.getJulianDayUTC(from: current)
+            let ownPradoshOverlap = pradoshOverlap(jdDayStart: jdDayStart, latitude: latitude, longitude: longitude)
+            var isPradoshVratDay = false
+            if ownPradoshOverlap > 0 {
+                let previousOverlap = pradoshOverlap(jdDayStart: jdDayStart - 1.0, latitude: latitude, longitude: longitude)
+                let nextOverlap     = pradoshOverlap(jdDayStart: jdDayStart + 1.0, latitude: latitude, longitude: longitude)
+                isPradoshVratDay = isPradoshDay(own: ownPradoshOverlap, previous: previousOverlap, next: nextOverlap)
+            }
 
             results.append(DailyPanchangSummary(
                 date:            current,
@@ -139,7 +140,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 vara:            PanchaangHelper.getVaraName(for: current),
                 lunarMonth:      Int(wrapper.calculatePurnimantaMonth(forJulianDay: jdSunrise)),
                 isAdhikMaas:     wrapper.calculateIsAdhikMaas(forJulianDay: jdSunrise),
-                pradoshTithiNumber: Int(wrapper.calculateTithiNumber(forJulianDay: jdPradosh))
+                isPradoshVrat:   isPradoshVratDay
             ))
 
             current = cal.date(byAdding: .day, value: 1, to: current) ?? end.addingTimeInterval(1)
@@ -265,29 +266,17 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                                    latitude: latitude, longitude: longitude)
         let bhadraKaal = computeBhadraKaal(sunriseJD: sunriseJD, nextSunriseJD: nextSunriseJD)
 
-        // Pradosh Kaal tithi — first fifth of the night after sunset, at its
-        // midpoint. Placed here to reuse nextSunriseJD above: Trayodashi is
-        // dated by dusk rather than sunrise, so the Pradosh Vrat badge
-        // cannot read tithiNumber.
-        let rawPradoshTithi = Int(wrapper.calculateTithiNumber(
-            forJulianDay: sunsetJD + max(nextSunriseJD - sunsetJD, 1.0 / 1440.0) / 10.0))
-
-        // A kshaya Trayodashi never touches ANY dusk reading, so a plain
-        // 13/28 match finds nothing and the badge silently disappears
-        // rather than showing a wrong day. Tomorrow's own dusk reading is
-        // only worth computing (one more sunrise/sunset call) when today's
-        // reading is close enough to 13 or 28 that a skip is even
-        // possible — most days are nowhere near either.
-        var pradoshTithi = rawPradoshTithi
-        if isNearPradosh(rawPradoshTithi) {
-            let nextSunsetJD = nextSunData["sunsetJD"] as? Double ?? (nextSunriseJD + 0.5)
-            let dayAfterNext = Calendar.current.date(byAdding: .day, value: 2, to: dayStart) ?? nextDayStart
-            let dayAfterNextSunData = wrapper.calculateSunriseSunset(for: dayAfterNext, latitude: latitude, longitude: longitude)
-            let dayAfterNextSunriseJD = dayAfterNextSunData["sunriseJD"] as? Double ?? (nextSunriseJD + 1.0)
-            let nextNightLen = max(dayAfterNextSunriseJD - nextSunsetJD, 1.0 / 1440.0)
-            let tomorrowRawPradoshTithi = Int(wrapper.calculateTithiNumber(
-                forJulianDay: nextSunsetJD + nextNightLen / 10.0))
-            pradoshTithi = kshayaCorrectedTithi(rawPradoshTithi, next: tomorrowRawPradoshTithi)
+        // Pradosh Vrat. Reuses nextSunriseJD above to close tonight's
+        // window; the two neighbouring days are only fetched when tonight
+        // actually holds some Trayodashi, which is a handful of days a
+        // month rather than every call to this hot path.
+        let ownPradoshOverlap = trayodashiMinutesInPradosh(sunsetJD: sunsetJD, nextSunriseJD: nextSunriseJD)
+        var isPradoshVratDay = false
+        if ownPradoshOverlap > 0 {
+            let jdDayStart = wrapper.getJulianDayUTC(from: dayStart)
+            let previousOverlap = pradoshOverlap(jdDayStart: jdDayStart - 1.0, latitude: latitude, longitude: longitude)
+            let nextOverlap     = pradoshOverlap(jdDayStart: jdDayStart + 1.0, latitude: latitude, longitude: longitude)
+            isPradoshVratDay = isPradoshDay(own: ownPradoshOverlap, previous: previousOverlap, next: nextOverlap)
         }
 
         return PanchangDay(
@@ -318,7 +307,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             lagnas:            lagnas,
             bhadraKaal:        bhadraKaal,
             amantaMonth:       amantaMonthName,
-            pradoshTithiNumber: pradoshTithi
+            isPradoshVrat:     isPradoshVratDay
         )
     }
 
@@ -483,50 +472,41 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     // computePanchang logic. Using midnight UTC caused mismatches in IST
     // (+5:30) where 00:00 IST = 18:30 UTC (previous day).
     //
-    // Pradosh Kaal tithi is also computed here (same formula the festival
-    // rules and computePanchang use): Pradosh Vrat is dated by dusk, not
-    // sunrise, so the calendar's trident cannot be derived from the sunrise
-    // reading alone. Sunrise and sunset are gathered once for the whole
-    // month plus two extra days rather than per-day: Pradosh Kaal needs the
-    // next day's sunrise to close the night, and the kshaya correction below
-    // needs one further day's dusk reading to detect a lost Trayodashi on
-    // the last day of the month — fetching either separately would double
-    // the ephemeris calls for a scan the calendar runs on every month change.
+    // Pradosh Vrat is decided here too, by overlap with each day's Pradosh
+    // Kaal window (see isPradoshDay below) rather than a sunrise reading —
+    // the calendar's trident cannot be derived from the sunrise tithi alone.
     private func computeMonthTithis(year: Int, month: Int, latitude: Double, longitude: Double) -> [Int: MonthDayTithis] {
         let cal = Calendar.current
         let comps = DateComponents(year: year, month: month, day: 1)
         guard let first = cal.date(from: comps),
               let count = cal.range(of: .day, in: .month, for: first)?.count else { return [:] }
 
-        // Index 0 unused; 1...count+2 populated (day count+1 = the 1st of
-        // the following month; day count+2 closes ITS night, needed only
-        // to detect a kshaya Trayodashi landing on day count+1).
-        var sunrises = [Double](repeating: 0, count: count + 3)
-        var sunsets  = [Double](repeating: 0, count: count + 3)
-        for day in 1...(count + 2) {
+        var sunrises = [Double](repeating: 0, count: count + 1)
+        for day in 1...count {
             guard let date = cal.date(byAdding: .day, value: day - 1, to: first) else { continue }
             let jd        = wrapper.getJulianDayUTC(from: date)
             let sunData   = wrapper.calculateSunriseSunset(for: date, latitude: latitude, longitude: longitude)
             let sunriseJD = sunData["sunriseJD"] as? Double ?? 0
-            let sunsetJD  = sunData["sunsetJD"]  as? Double ?? 0
             sunrises[day] = sunriseJD > 2_400_000 ? sunriseJD : jd
-            sunsets[day]  = sunsetJD  > 2_400_000 ? sunsetJD  : jd + 0.5
         }
 
-        // Raw (uncorrected) dusk reading for every day through count+1, so
-        // the correction pass below can compare day against day+1 even on
-        // the last day of the month.
-        var rawPradoshTithi = [Int](repeating: 0, count: count + 2)
-        for day in 1...(count + 1) {
-            let nightLen = max(sunrises[day + 1] - sunsets[day], 1.0 / 1440.0)
-            rawPradoshTithi[day] = Int(wrapper.calculateTithiNumber(forJulianDay: sunsets[day] + nightLen / 10.0))
+        // Pradosh Kaal overlap for every day plus the two the month's edges
+        // compare against, so the 1st and the last can be judged against
+        // neighbours outside the month. Index `offset+1` holds the day
+        // `offset - 1` days from the 1st (offset 0 = the day before the
+        // month starts, offset count+1 = the day after it ends).
+        var overlap = [Int](repeating: 0, count: count + 3)
+        for offset in 0...(count + 1) {
+            guard let date = cal.date(byAdding: .day, value: offset - 1, to: first) else { continue }
+            let jd = wrapper.getJulianDayUTC(from: date)
+            overlap[offset + 1] = pradoshOverlap(jdDayStart: jd, latitude: latitude, longitude: longitude)
         }
 
         var results: [Int: MonthDayTithis] = [:]
         for day in 1...count {
             results[day] = MonthDayTithis(
                 sunriseTithi: Int(wrapper.calculateTithiNumber(forJulianDay: sunrises[day])),
-                pradoshTithi: kshayaCorrectedTithi(rawPradoshTithi[day], next: rawPradoshTithi[day + 1])
+                isPradoshVrat: isPradoshDay(own: overlap[day + 1], previous: overlap[day], next: overlap[day + 2])
             )
         }
         return results
@@ -875,44 +855,54 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         Date(timeIntervalSince1970: (jd - 2_440_587.5) * 86_400)
     }
 
-    // MARK: - Pradosh Vrat kshaya correction
+    // MARK: - Pradosh Vrat (overlap with Pradosh Kaal)
     //
-    // Trayodashi (13 Krishna, 28 Shukla) is dated by Pradosh Kaal (dusk),
-    // not sunrise — but the same kshaya problem the sunrise-based festival
-    // fallback handles can happen at dusk too: if Trayodashi begins after
-    // one dusk reading and ends before the next, it never touches ANY dusk
-    // sample, and a plain 13/28 match silently finds nothing on any day.
+    // Pradosh Vrat is kept on the day Trayodashi *prevails during* Pradosh
+    // Kaal — an overlap with a window, not a tithi read at one instant.
+    // Sampling a single point inside the window (the midpoint) can miss a
+    // Trayodashi that covers only part of it: on 1 Mar 2026, Trayodashi ran
+    // 28 Feb 20:44 – 1 Mar 19:10 while the midpoint sample sat at 19:44, so
+    // neither day matched and the vrat vanished from that fortnight — not a
+    // kshaya case, since Trayodashi genuinely touched a Pradosh window.
     //
-    // The fix is the same shape as the sunrise kshaya fallback: a kshaya
-    // tithi is fully contained within exactly one reading-to-next-reading
-    // window, so comparing consecutive dusk readings and checking the gap
-    // between them identifies both whether a tithi was skipped and which
-    // day contains it — the day whose reading was taken before the gap.
+    // A Trayodashi normally touches two consecutive windows; the vrat
+    // belongs to whichever holds more of it, ties going to the later day.
+    // Checked day by day across 2020–2043, this selects exactly one day per
+    // Trayodashi — which also retires the kshaya special case entirely,
+    // since a Trayodashi that reaches no window at all cannot occur.
 
-    /// Cheap pre-check: could `tithi` possibly be one dusk reading away from
-    /// 13 or 28? A real kshaya skips at most two tithis, so anything more
-    /// than two away cannot be adjacent to a lost Trayodashi and the caller
-    /// can skip the extra sunrise/sunset lookup entirely.
-    private func isNearPradosh(_ tithi: Int) -> Bool {
-        func near(_ target: Int) -> Bool {
-            let diff = abs(tithi - target)
-            return diff <= 2 || diff >= 28
+    /// Minutes of Trayodashi falling inside this day's Pradosh Kaal window
+    /// (sunset to sunset + 1/5 of the night).
+    private func trayodashiMinutesInPradosh(sunsetJD: Double, nextSunriseJD: Double) -> Int {
+        let nightLen  = max(nextSunriseJD - sunsetJD, 1.0 / 1440.0)
+        let windowEnd = sunsetJD + nightLen / 5.0
+        let step: Double = 1.0 / 1440.0
+        var minutes = 0
+        var t = sunsetJD
+        while t < windowEnd {
+            let tithi = Int(wrapper.calculateTithiNumber(forJulianDay: t))
+            if tithi == 13 || tithi == 28 { minutes += 1 }
+            t += step
         }
-        return near(13) || near(28)
+        return minutes
     }
 
-    /// If `next` skips past 13 or 28 relative to `tithi` (a real kshaya —
-    /// gap of 1–2, not a same-tithi vriddhi repeat), returns the skipped
-    /// target so the caller can attribute the lost Pradosh Vrat to `tithi`'s
-    /// own day. Otherwise returns `tithi` unchanged.
-    private func kshayaCorrectedTithi(_ tithi: Int, next: Int) -> Int {
-        let gap = (((next - tithi - 1) % 30) + 30) % 30
-        guard (1...2).contains(gap) else { return tithi }
-        for offset in 1...gap {
-            let skipped = ((tithi - 1 + offset) % 30) + 1
-            if skipped == 13 || skipped == 28 { return skipped }
-        }
-        return tithi
+    /// `trayodashiMinutesInPradosh` for the day starting at `jdDayStart`.
+    private func pradoshOverlap(jdDayStart: Double, latitude: Double, longitude: Double) -> Int {
+        let dayStart = jdToDate(jdDayStart)
+        let sunData = wrapper.calculateSunriseSunset(for: dayStart, latitude: latitude, longitude: longitude)
+        guard let sunsetJD = sunData["sunsetJD"] as? Double else { return 0 }
+        let nextDayStart = jdToDate(jdDayStart + 1.0)
+        let nextSunData = wrapper.calculateSunriseSunset(for: nextDayStart, latitude: latitude, longitude: longitude)
+        guard let nextSunriseJD = nextSunData["sunriseJD"] as? Double else { return 0 }
+        return trayodashiMinutesInPradosh(sunsetJD: sunsetJD, nextSunriseJD: nextSunriseJD)
+    }
+
+    /// Whether this is the day to keep Pradosh Vrat: it must hold some
+    /// Trayodashi, at least as much as yesterday, and strictly more than
+    /// tomorrow — the asymmetry is what sends a tie to the later day.
+    private func isPradoshDay(own: Int, previous: Int, next: Int) -> Bool {
+        own > 0 && own >= previous && own > next
     }
 
     // MARK: - Eclipses (always called from `queue`)

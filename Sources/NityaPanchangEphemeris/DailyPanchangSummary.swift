@@ -22,16 +22,17 @@ public struct DailyPanchangSummary: Sendable {
     public let vara:          String   // "Sunday"…"Saturday"
     public let lunarMonth:    Int      // 1–12
     public let isAdhikMaas:   Bool
-    /// Tithi prevailing at Pradosh Kaal (first fifth of the night after
-    /// sunset, sampled at its midpoint) rather than at sunrise. Trayodashi
-    /// (13/28) is conventionally dated by this reading, not Udaya Tithi —
-    /// "Pradosh" literally means dusk — so a plain `tithiNumber` match would
-    /// pick the wrong day whenever Trayodashi starts after sunrise and is
-    /// still active that evening but has ended by the next sunrise.
-    public let pradoshTithiNumber: Int  // 1–30
+    /// Whether Pradosh Vrat is kept on this day.
+    ///
+    /// Decided by how much Trayodashi falls inside each day's Pradosh Kaal
+    /// window rather than by a tithi read at one instant, because the vrat
+    /// is dated by the tithi *prevailing during* dusk. A Trayodashi usually
+    /// touches two consecutive windows and belongs to whichever holds more
+    /// of it.
+    public let isPradoshVrat: Bool
 
     public init(date: Date, tithiNumber: Int, nakshatraName: String, moonRashiNumber: Int,
-                vara: String, lunarMonth: Int, isAdhikMaas: Bool, pradoshTithiNumber: Int) {
+                vara: String, lunarMonth: Int, isAdhikMaas: Bool, isPradoshVrat: Bool = false) {
         self.date = date
         self.tithiNumber = tithiNumber
         self.nakshatraName = nakshatraName
@@ -39,6 +40,6 @@ public struct DailyPanchangSummary: Sendable {
         self.vara = vara
         self.lunarMonth = lunarMonth
         self.isAdhikMaas = isAdhikMaas
-        self.pradoshTithiNumber = pradoshTithiNumber
+        self.isPradoshVrat = isPradoshVrat
     }
 }
