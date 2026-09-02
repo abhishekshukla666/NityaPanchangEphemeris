@@ -92,6 +92,25 @@
     };
 }
 
+- (NPSunTimes)calculateSunTimesForDate:(NSDate *)date latitude:(double)latitude longitude:(double)longitude {
+    swe_set_topo(longitude, latitude, 0);
+    NSCalendar *localCalendar = [NSCalendar currentCalendar];
+    NSDate *startOfLocalDay = [localCalendar startOfDayForDate:date];
+    double jd_startOfLocalDay = [self getJulianDayUTCFromDate:startOfLocalDay];
+
+    double riseTret[3] = {0.0, 0.0, 0.0};
+    double setTret[3]  = {0.0, 0.0, 0.0};
+
+    char errorMessage[256];
+    char starname[] = "";
+    double geopos[3] = {longitude, latitude, 0.0};
+
+    swe_rise_trans(jd_startOfLocalDay, SE_SUN, starname, SEFLG_SWIEPH, SE_CALC_RISE, geopos, 0.0, 0.0, riseTret, errorMessage);
+    swe_rise_trans(jd_startOfLocalDay, SE_SUN, starname, SEFLG_SWIEPH, SE_CALC_SET,  geopos, 0.0, 0.0, setTret,  errorMessage);
+
+    return (NPSunTimes){ .riseJD = riseTret[0], .setJD = setTret[0] };
+}
+
 // Newton-Raphson helper: refines an approximate Purnima JD (elongation = 180°).
 // Converges in 5-7 iterations (synodic variability can cause up to ~12 h linear error).
 static double refinePurnimaJD(SwissEphWrapper *self, double approxJD) {

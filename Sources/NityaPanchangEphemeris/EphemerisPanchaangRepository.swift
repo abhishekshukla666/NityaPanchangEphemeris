@@ -113,8 +113,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         let end = cal.startOfDay(for: endDate)
 
         while current <= end {
-            let sunData  = wrapper.calculateSunriseSunset(for: current, latitude: latitude, longitude: longitude)
-            let rawSunriseJD = sunData["sunriseJD"] as? Double ?? 0
+            let sunData  = wrapper.calculateSunTimes(for: current, latitude: latitude, longitude: longitude)
+            let rawSunriseJD = sunData.riseJD
             let jdSunrise = rawSunriseJD > 2_400_000
                 ? rawSunriseJD
                 : wrapper.getJulianDayUTC(from: current.addingTimeInterval(6 * 3600))
@@ -248,8 +248,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         }
 
         let nextDayStart  = Calendar.current.date(byAdding: .day, value: 1, to: dayStart)!
-        let nextSunData   = wrapper.calculateSunriseSunset(for: nextDayStart, latitude: latitude, longitude: longitude)
-        let nextSunriseJD = nextSunData["sunriseJD"] as? Double ?? (sunriseJD + 1.0)
+        let nextSunData   = wrapper.calculateSunTimes(for: nextDayStart, latitude: latitude, longitude: longitude)
+        let nextSunriseJD = nextSunData.riseJD
         let nightStarts   = [5, 1, 4, 0, 3, 6, 2]
         let nightSegLen   = max(nextSunriseJD - sunsetJD, 1.0 / 1440.0) / 8.0
         let nightChaughariya: [Muhurat] = (0..<8).map { i in
@@ -481,15 +481,25 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         guard let first = cal.date(from: comps),
               let count = cal.range(of: .day, in: .month, for: first)?.count else { return [:] }
 
-        // One day past the month: the last day's lost-tithi check needs the
-        // sunrise after it to see what was skipped in between.
-        var sunrises = [Double](repeating: 0, count: count + 2)
-        for day in 1...(count + 1) {
-            guard let date = cal.date(byAdding: .day, value: day - 1, to: first) else { continue }
+        // Sunrise and sunset for the whole month plus a day either side, in
+        // one pass. Index `i` is the day `i - 1` days from the 1st, so `i = 0`
+        // is the day before the month and `i = count + 2` the second day after
+        // it. The Pradosh overlap below needs sunset at `i` against sunrise at
+        // `i + 1`, and the lost-tithi check needs the sunrise past the last
+        // day, which is what the padding at both ends covers.
+        //
+        // These used to be gathered twice: this loop took the sunrises, then
+        // the overlap pass called pradoshOverlap per day, which fetched a
+        // sunrise and a sunset of its own — about 97 calls a month where 33
+        // suffice.
+        var sunrises = [Double](repeating: 0, count: count + 3)
+        var sunsets  = [Double](repeating: 0, count: count + 3)
+        for i in 0...(count + 2) {
+            guard let date = cal.date(byAdding: .day, value: i - 1, to: first) else { continue }
             let jd        = wrapper.getJulianDayUTC(from: date)
-            let sunData   = wrapper.calculateSunriseSunset(for: date, latitude: latitude, longitude: longitude)
-            let sunriseJD = sunData["sunriseJD"] as? Double ?? 0
-            sunrises[day] = sunriseJD > 2_400_000 ? sunriseJD : jd
+            let sunData   = wrapper.calculateSunTimes(for: date, latitude: latitude, longitude: longitude)
+            sunrises[i] = sunData.riseJD > 2_400_000 ? sunData.riseJD : jd
+            sunsets[i]  = sunData.setJD
         }
 
         // Pradosh Kaal overlap for every day plus the two the month's edges
@@ -499,9 +509,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         // month starts, offset count+1 = the day after it ends).
         var overlap = [Int](repeating: 0, count: count + 3)
         for offset in 0...(count + 1) {
-            guard let date = cal.date(byAdding: .day, value: offset - 1, to: first) else { continue }
-            let jd = wrapper.getJulianDayUTC(from: date)
-            overlap[offset + 1] = pradoshOverlap(jdDayStart: jd, latitude: latitude, longitude: longitude)
+            overlap[offset + 1] = trayodashiMinutesInPradosh(sunsetJD: sunsets[offset],
+                                                            nextSunriseJD: sunrises[offset + 1])
         }
 
         var results: [Int: MonthDayTithis] = [:]
@@ -623,10 +632,10 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                     guard nearSunrise() else { continue }
 
                     if cachedMadhyahnaTithi == nil {
-                        let sunData      = wrapper.calculateSunriseSunset(
+                        let sunData      = wrapper.calculateSunTimes(
                             for: startOfDay, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
-                        let sunriseRefJD = sunData["sunriseJD"] as? Double ?? jdSunrise
-                        let sunsetRefJD  = sunData["sunsetJD"]  as? Double ?? (sunriseRefJD + 0.5)
+                        let sunriseRefJD = sunData.riseJD
+                        let sunsetRefJD  = sunData.setJD
 
                         // Madhyahna Kaal: the third of five equal divisions of
                         // daylight, sampled at its midpoint — one division
@@ -646,10 +655,10 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                     guard nearSunrise() else { continue }
 
                     if cachedAparahnaTithi == nil {
-                        let sunData      = wrapper.calculateSunriseSunset(
+                        let sunData      = wrapper.calculateSunTimes(
                             for: startOfDay, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
-                        let sunriseRefJD = sunData["sunriseJD"] as? Double ?? jdSunrise
-                        let sunsetRefJD  = sunData["sunsetJD"]  as? Double ?? (sunriseRefJD + 0.5)
+                        let sunriseRefJD = sunData.riseJD
+                        let sunsetRefJD  = sunData.setJD
 
                         // Aparahna Kaal: the fourth of five equal divisions of daylight
                         // (Pratahkal, Sangava, Madhyahna, Aparahna, Sayahna — in that order),
@@ -788,33 +797,33 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         var cursor = cursorStart
         while cursor <= scanEnd {
             let dayStart = cal.startOfDay(for: cursor)
-            let sunData = wrapper.calculateSunriseSunset(for: dayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+            let sunData = wrapper.calculateSunTimes(for: dayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
             let nextDayStart = cal.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
-            let nextSunData = wrapper.calculateSunriseSunset(for: nextDayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+            let nextSunData = wrapper.calculateSunTimes(for: nextDayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
 
-            if let sunsetJD = sunData["sunsetJD"] as? Double, let nextSunriseJD = nextSunData["sunriseJD"] as? Double {
-                let nightLen  = max(nextSunriseJD - sunsetJD, 1.0 / 1440.0)
-                let pradoshJD = sunsetJD + nightLen / 10.0
-                let anchorTithi   = Int(wrapper.calculateTithiNumber(forJulianDay: pradoshJD))
-                let anchorMonth   = Int(wrapper.calculatePurnimantaMonth(forJulianDay: pradoshJD))
-                let anchorIsAdhik = wrapper.calculateIsPurnimantaAdhikMaas(forJulianDay: pradoshJD)
+            let sunsetJD      = sunData.setJD
+            let nextSunriseJD = nextSunData.riseJD
+            let nightLen  = max(nextSunriseJD - sunsetJD, 1.0 / 1440.0)
+            let pradoshJD = sunsetJD + nightLen / 10.0
+            let anchorTithi   = Int(wrapper.calculateTithiNumber(forJulianDay: pradoshJD))
+            let anchorMonth   = Int(wrapper.calculatePurnimantaMonth(forJulianDay: pradoshJD))
+            let anchorIsAdhik = wrapper.calculateIsPurnimantaAdhikMaas(forJulianDay: pradoshJD)
 
-                // Phalguna Purnima at Pradosh: the one day a year this can fire.
-                if anchorTithi == 30, anchorMonth == 12, !anchorIsAdhik {
-                    let bhadraEnds = bhadraEndAfter(windowStart: sunsetJD, windowEnd: sunsetJD + nightLen / 5.0)
-                    let nextMidnight = cal.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
-                    let defer_ = bhadraEnds.map { $0 >= nextMidnight } ?? false
+            // Phalguna Purnima at Pradosh: the one day a year this can fire.
+            if anchorTithi == 30, anchorMonth == 12, !anchorIsAdhik {
+                let bhadraEnds = bhadraEndAfter(windowStart: sunsetJD, windowEnd: sunsetJD + nightLen / 5.0)
+                let nextMidnight = cal.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
+                let defer_ = bhadraEnds.map { $0 >= nextMidnight } ?? false
 
-                    let dahan = defer_ ? nextMidnight : dayStart
-                    let holi  = cal.date(byAdding: .day, value: 1, to: dahan) ?? dahan
-                    let year  = cal.component(.year, from: dahan)
+                let dahan = defer_ ? nextMidnight : dayStart
+                let holi  = cal.date(byAdding: .day, value: 1, to: dahan) ?? dahan
+                let year  = cal.component(.year, from: dahan)
 
-                    if seen.insert("Holika Dahan-\(year)").inserted {
-                        out.append(HinduFestival(name: "Holika Dahan", date: dahan, emoji: "🔥", hasIcon: false))
-                    }
-                    if seen.insert("Holi-\(year)").inserted {
-                        out.append(HinduFestival(name: "Holi", date: holi, emoji: "holi", hasIcon: true))
-                    }
+                if seen.insert("Holika Dahan-\(year)").inserted {
+                    out.append(HinduFestival(name: "Holika Dahan", date: dahan, emoji: "🔥", hasIcon: false))
+                }
+                if seen.insert("Holi-\(year)").inserted {
+                    out.append(HinduFestival(name: "Holi", date: holi, emoji: "holi", hasIcon: true))
                 }
             }
             cursor = cal.date(byAdding: .day, value: 1, to: cursor) ?? scanEnd.addingTimeInterval(1)
@@ -989,11 +998,11 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     /// `trayodashiMinutesInPradosh` for the day starting at `jdDayStart`.
     private func pradoshOverlap(jdDayStart: Double, latitude: Double, longitude: Double) -> Int {
         let dayStart = jdToDate(jdDayStart)
-        let sunData = wrapper.calculateSunriseSunset(for: dayStart, latitude: latitude, longitude: longitude)
-        guard let sunsetJD = sunData["sunsetJD"] as? Double else { return 0 }
+        let sunData = wrapper.calculateSunTimes(for: dayStart, latitude: latitude, longitude: longitude)
+        let sunsetJD = sunData.setJD
         let nextDayStart = jdToDate(jdDayStart + 1.0)
-        let nextSunData = wrapper.calculateSunriseSunset(for: nextDayStart, latitude: latitude, longitude: longitude)
-        guard let nextSunriseJD = nextSunData["sunriseJD"] as? Double else { return 0 }
+        let nextSunData = wrapper.calculateSunTimes(for: nextDayStart, latitude: latitude, longitude: longitude)
+        let nextSunriseJD = nextSunData.riseJD
         return trayodashiMinutesInPradosh(sunsetJD: sunsetJD, nextSunriseJD: nextSunriseJD)
     }
 
@@ -1014,10 +1023,10 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     /// longer than this window, so at most one boundary can fall in it.
     private func pradoshOverlapOfTithi(jdDayStart: Double, tithi: Int) -> Int {
         let dayStart = jdToDate(jdDayStart)
-        let sunData = wrapper.calculateSunriseSunset(for: dayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
-        guard let sunsetJD = sunData["sunsetJD"] as? Double else { return 0 }
-        let nextSunData = wrapper.calculateSunriseSunset(for: jdToDate(jdDayStart + 1.0), latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
-        guard let nextSunriseJD = nextSunData["sunriseJD"] as? Double else { return 0 }
+        let sunData = wrapper.calculateSunTimes(for: dayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        let sunsetJD = sunData.setJD
+        let nextSunData = wrapper.calculateSunTimes(for: jdToDate(jdDayStart + 1.0), latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        let nextSunriseJD = nextSunData.riseJD
 
         let nightLen      = max(nextSunriseJD - sunsetJD, 1.0 / 1440.0)
         let windowEnd     = sunsetJD + nightLen / 5.0
@@ -1045,10 +1054,10 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     /// lunar month travels with the tithi that qualified, not with whatever
     /// happens to occupy the midpoint.
     private func anchorAtTithiInPradosh(jdDayStart: Double, tithi: Int) -> (tithi: Int, month: Int, isAdhik: Bool) {
-        let sunData = wrapper.calculateSunriseSunset(for: jdToDate(jdDayStart), latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
-        guard let sunsetJD = sunData["sunsetJD"] as? Double else { return anchor(at: jdDayStart) }
-        let nextSunData = wrapper.calculateSunriseSunset(for: jdToDate(jdDayStart + 1.0), latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
-        let nextSunriseJD = nextSunData["sunriseJD"] as? Double ?? (sunsetJD + 0.5)
+        let sunData = wrapper.calculateSunTimes(for: jdToDate(jdDayStart), latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        let sunsetJD = sunData.setJD
+        let nextSunData = wrapper.calculateSunTimes(for: jdToDate(jdDayStart + 1.0), latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        let nextSunriseJD = nextSunData.riseJD
         let windowEnd = sunsetJD + max(nextSunriseJD - sunsetJD, 1.0 / 1440.0) / 5.0
         let at = Int(wrapper.calculateTithiNumber(forJulianDay: sunsetJD)) == tithi ? sunsetJD : windowEnd
         return anchor(at: at)
@@ -1068,9 +1077,9 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     /// Falls back to the old proxy only where sunrise genuinely does not
     /// occur, matching computeDailySummaries: a scan must still yield a row.
     private func referenceSunriseJD(for startOfDay: Date) -> Double {
-        let sunData = wrapper.calculateSunriseSunset(
+        let sunData = wrapper.calculateSunTimes(
             for: startOfDay, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
-        let sunriseJD = sunData["sunriseJD"] as? Double ?? 0
+        let sunriseJD = sunData.riseJD
         return sunriseJD > 2_400_000
             ? sunriseJD
             : wrapper.getJulianDayUTC(from: startOfDay.addingTimeInterval(6 * 3600))
@@ -1119,8 +1128,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     private func sankrantiDeferringPastSunset(ingressJD: Double) -> Date {
         let cal = Calendar.current
         let ingressDayStart = cal.startOfDay(for: jdToDate(ingressJD))
-        let sunData = wrapper.calculateSunriseSunset(for: ingressDayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
-        if let sunsetJD = sunData["sunsetJD"] as? Double, ingressJD > sunsetJD {
+        let sunData = wrapper.calculateSunTimes(for: ingressDayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        if ingressJD > sunData.setJD {
             return cal.date(byAdding: .day, value: 1, to: ingressDayStart) ?? ingressDayStart
         }
         return ingressDayStart
@@ -1137,8 +1146,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     private func sankrantiByHinduDay(ingressJD: Double) -> Date {
         let cal = Calendar.current
         let clockDayStart = cal.startOfDay(for: jdToDate(ingressJD))
-        let sunData = wrapper.calculateSunriseSunset(for: clockDayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
-        if let sunriseJD = sunData["sunriseJD"] as? Double, ingressJD < sunriseJD {
+        let sunData = wrapper.calculateSunTimes(for: clockDayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        if ingressJD < sunData.riseJD {
             return cal.date(byAdding: .day, value: -1, to: clockDayStart) ?? clockDayStart
         }
         return clockDayStart

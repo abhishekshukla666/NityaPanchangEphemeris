@@ -7,6 +7,12 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+/// Sunrise and sunset as Julian Days; 0 where the event does not occur.
+typedef struct {
+    double riseJD;
+    double setJD;
+} NPSunTimes;
+
 @interface SwissEphWrapper : NSObject
 
 /// Purnimanta tithi number (1–30): Krishna 1–15 (1=Pratipada … 15=Amavasya),
@@ -19,6 +25,17 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSDictionary *)calculateSunriseSunsetForDate:(NSDate *)date
                                        latitude:(double)latitude
                                       longitude:(double)longitude;
+
+/// Sunrise and sunset only — no moon.
+///
+/// calculateSunriseSunsetForDate issues four swe_rise_trans searches, and the
+/// moon pair is about 60% of its cost. Of its seventeen call sites in
+/// EphemerisPanchaangRepository exactly one reads the moon, and a month scan
+/// makes tens of these calls, so the rest use this. Returns a struct rather
+/// than a dictionary to keep the boxing out of that loop.
+- (NPSunTimes)calculateSunTimesForDate:(NSDate *)date
+                              latitude:(double)latitude
+                             longitude:(double)longitude;
 
 /// Solar month (Saura Mana): Sun's current sidereal rashi → 1–12 (Chaitra=1…Phalguna=12).
 - (int)calculateLunarMonthForJulianDay:(double)jd;
