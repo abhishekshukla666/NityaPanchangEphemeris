@@ -50,6 +50,24 @@ public struct FestivalRule: Sendable {
     public var hasIcon: Bool = false
     public var observationTime: ObservationTime = .sunrise
 
+    /// A vriddhi Ekadashi — one whose tithi is current at two consecutive
+    /// sunrises — is kept on the **second** day, not the first.
+    ///
+    /// The first day is Dashami-viddha: Dashami was still running into it, and
+    /// the vrat may not be kept on such a day. Published dates agree across
+    /// Amalaki 2023 (3 Mar), Nirjala 2024 (18 Jun), Rama 2024 (28 Oct) and
+    /// Vijaya 2027 (4 Mar) — in each the tithi holds both sunrises and the
+    /// observance is the later one. Ordinary festivals take the *first*
+    /// sunrise their tithi touches, which is why this cannot be the default.
+    ///
+    /// Only vriddhi. A *kshaya* Ekadashi, touching no sunrise at all, stays on
+    /// the day that held the greater part of it — the ordinary fallback — as
+    /// Parivartini 2023 (25 Sep) and Yogini 2025 (21 Jun) both show.
+    ///
+    /// Derived from the tithi rather than set per rule, so all twenty-four
+    /// Ekadashis are covered without per-rule bookkeeping.
+    public var resolvesForward: Bool { tithiNumber == 11 || tithiNumber == 26 }
+
     public init(name: String, emoji: String, lunarMonth: Int, tithiNumber: Int,
                 hasIcon: Bool = false, observationTime: ObservationTime = .sunrise) {
         self.name = name

@@ -547,7 +547,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             let startOfDay = cal.startOfDay(for: current)
 
             // 1. ALWAYS calculate Sunrise (Base metrics for the day)
-            let jdSunrise = wrapper.getJulianDayUTC(from: startOfDay.addingTimeInterval(6 * 3600))
+            let jdSunrise = referenceSunriseJD(for: startOfDay)
             let tithiSunrise = Int(wrapper.calculateTithiNumber(forJulianDay: jdSunrise))
             let monthSunrise = Int(wrapper.calculatePurnimantaMonth(forJulianDay: jdSunrise))
             let isAdhikSunrise = wrapper.calculateIsAdhikMaas(forJulianDay: jdSunrise)
@@ -676,6 +676,17 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
 
                 // Check for an exact match
                 if rule.lunarMonth == activeMonth && rule.tithiNumber == activeTithi {
+                    // Vriddhi: when the tithi also holds tomorrow's sunrise,
+                    // an Ekadashi belongs to that second day, not this first
+                    // one — today is the Dashami-viddha side. Everything else
+                    // keeps the first sunrise it touches, which is what the
+                    // `seen` set already gives it.
+                    if rule.resolvesForward, rule.observationTime == .sunrise,
+                       let tomorrow = cal.date(byAdding: .day, value: 1, to: startOfDay),
+                       Int(wrapper.calculateTithiNumber(forJulianDay: referenceSunriseJD(for: tomorrow))) == rule.tithiNumber {
+                        continue
+                    }
+
                     let key = "\(rule.name)-\(calYear)"
 
                     if seen.insert(key).inserted {
@@ -876,7 +887,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
 
         while current <= scanEnd {
             let startOfDay = cal.startOfDay(for: current)
-            let jdSunrise  = wrapper.getJulianDayUTC(from: startOfDay.addingTimeInterval(6 * 3600))
+            let jdSunrise  = referenceSunriseJD(for: startOfDay)
             let tithi      = Int(wrapper.calculateTithiNumber(forJulianDay: jdSunrise))
             let month      = Int(wrapper.calculatePurnimantaMonth(forJulianDay: jdSunrise))
             let isAdhik    = wrapper.calculateIsAdhikMaas(forJulianDay: jdSunrise)
@@ -1041,6 +1052,28 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         let windowEnd = sunsetJD + max(nextSunriseJD - sunsetJD, 1.0 / 1440.0) / 5.0
         let at = Int(wrapper.calculateTithiNumber(forJulianDay: sunsetJD)) == tithi ? sunsetJD : windowEnd
         return anchor(at: at)
+    }
+
+    /// Sunrise at the Ujjain reference for the day starting at `startOfDay` —
+    /// the instant every Udaya Tithi festival rule is matched against.
+    ///
+    /// This was 06:00 local standing in for sunrise. Real sunrise at Ujjain
+    /// runs from about 05:40 in June to 07:10 in January, so the proxy sat up
+    /// to an hour early and read any tithi ending inside that gap as still
+    /// current. Magha Shukla Panchami ends at 06:5x on 3 Feb 2025: the proxy
+    /// saw Panchami and dated Basant Panchami and Saraswati Puja to the 3rd,
+    /// when the tithi in fact reaches no sunrise at all and belongs — via the
+    /// kshaya fallback — to the 2nd, as published.
+    ///
+    /// Falls back to the old proxy only where sunrise genuinely does not
+    /// occur, matching computeDailySummaries: a scan must still yield a row.
+    private func referenceSunriseJD(for startOfDay: Date) -> Double {
+        let sunData = wrapper.calculateSunriseSunset(
+            for: startOfDay, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        let sunriseJD = sunData["sunriseJD"] as? Double ?? 0
+        return sunriseJD > 2_400_000
+            ? sunriseJD
+            : wrapper.getJulianDayUTC(from: startOfDay.addingTimeInterval(6 * 3600))
     }
 
     private func anchor(at jd: Double) -> (tithi: Int, month: Int, isAdhik: Bool) {

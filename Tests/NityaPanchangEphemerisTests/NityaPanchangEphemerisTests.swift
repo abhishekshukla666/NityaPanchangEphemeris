@@ -345,15 +345,14 @@ final class NityaPanchangEphemerisTests: XCTestCase {
         }
     }
 
-    /// Known defect, pinned so it is not mistaken for a rule problem.
+    /// Real sunrise is what the festival scan reads, not the old 06:00 proxy.
     ///
-    /// The festival scan reads the tithi at 06:00 local as a stand-in for
-    /// sunrise. Real sunrise at Ujjain on 3 Feb 2025 is 07:05, and Magha
-    /// Shukla Panchami ends in between: the proxy sees tithi 20 and matches
-    /// the day, while the real sunrise sees 21. The tithi therefore reaches no
-    /// sunrise at all that fortnight and should fall to the kshaya fallback,
-    /// which would date it 2 Feb as published. Every sunrise-observed festival
-    /// whose tithi turns over in that pre-dawn hour is exposed to this.
+    /// Sunrise at Ujjain runs from about 05:40 in June to 07:10 in January, so
+    /// the proxy sat up to an hour early and read any tithi ending in that gap
+    /// as still current. Magha Shukla Panchami ends at 06:5x on 3 Feb 2025:
+    /// the proxy saw Panchami and dated Basant Panchami to the 3rd, when the
+    /// tithi in fact reaches no sunrise at all and belongs — via the kshaya
+    /// fallback — to the 2nd, as published.
     func testSunriseProxyMissesATithiThatEndsBeforeRealSunrise() throws {
         let wrapper = SwissEphWrapper()
         let cal = Calendar(identifier: .gregorian)
@@ -370,5 +369,67 @@ final class NityaPanchangEphemerisTests: XCTestCase {
                        "the 06:00 proxy still reads Panchami")
         XCTAssertEqual(Int(wrapper.calculateTithiNumber(forJulianDay: realJD)), 21,
                        "real sunrise is already past it — so Panchami touches no sunrise")
+    }
+
+    /// Festivals whose dates the real-sunrise switch corrects.
+    ///
+    /// Each of these has a tithi that turns over between 06:00 and real
+    /// sunrise, so the old proxy read the wrong day for it.
+    func testRealSunriseCorrectsFestivalDates() async throws {
+        let repo = EphemerisPanchaangRepository()
+        try await assertFestival(repo, "Basant Panchami", on: (2025, 2, 2))
+        try await assertFestival(repo, "Saraswati Puja",  on: (2025, 2, 2))
+        try await assertFestival(repo, "Chhath Puja",     on: (2025, 10, 27))
+    }
+
+    /// A vriddhi Ekadashi — current at two consecutive sunrises — is kept on
+    /// the second day; the first is Dashami-viddha.
+    ///
+    /// The scan otherwise takes the first sunrise a tithi touches, which is
+    /// right for every other festival and wrong for exactly these. All four
+    /// dates are the published observances.
+    func testVriddhiEkadashiIsKeptOnTheSecondSunrise() async throws {
+        let repo = EphemerisPanchaangRepository()
+        try await assertFestival(repo, "Amalaki Ekadashi", on: (2023, 3, 3))
+        try await assertFestival(repo, "Nirjala Ekadashi", on: (2024, 6, 18))
+        try await assertFestival(repo, "Rama Ekadashi",    on: (2024, 10, 28))
+        try await assertFestival(repo, "Vijaya Ekadashi",  on: (2027, 3, 4))
+    }
+
+    /// A kshaya Ekadashi touches no sunrise and stays on the day that held the
+    /// greater part of it — it does NOT move forward like a vriddhi one.
+    func testKshayaEkadashiStaysOnTheDayThatHeldIt() async throws {
+        let repo = EphemerisPanchaangRepository()
+        try await assertFestival(repo, "Parivartini Ekadashi", on: (2023, 9, 25))
+        try await assertFestival(repo, "Yogini Ekadashi",      on: (2025, 6, 21))
+    }
+
+    /// Asserts `name` is produced exactly once in its year, on `on`.
+    private func assertFestival(
+        _ repo: EphemerisPanchaangRepository,
+        _ name: String,
+        on expected: (year: Int, month: Int, day: Int),
+        file: StaticString = #filePath, line: UInt = #line
+    ) async throws {
+        let cal = Calendar(identifier: .gregorian)
+        let tz = try XCTUnwrap(TimeZone(identifier: "Asia/Kolkata"))
+        var comps = DateComponents()
+        comps.timeZone = tz
+        comps.year = expected.year; comps.month = 1; comps.day = 1
+        let from = try XCTUnwrap(cal.date(from: comps))
+        comps.month = 12; comps.day = 31
+        let to = try XCTUnwrap(cal.date(from: comps))
+
+        let matches = try await repo.fetchFestivals(from: from, to: to)
+            .filter { $0.name == name }
+        XCTAssertEqual(matches.count, 1,
+                       "expected one \(name) in \(expected.year)", file: file, line: line)
+
+        let got = try XCTUnwrap(matches.first?.date, file: file, line: line)
+        var c = cal; c.timeZone = tz
+        let d = c.dateComponents([.year, .month, .day], from: got)
+        XCTAssertEqual([d.year, d.month, d.day],
+                       [expected.year, expected.month, expected.day],
+                       "\(name) is on the wrong day", file: file, line: line)
     }
 }
