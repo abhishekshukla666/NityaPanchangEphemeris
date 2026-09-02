@@ -876,15 +876,36 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     private func trayodashiMinutesInPradosh(sunsetJD: Double, nextSunriseJD: Double) -> Int {
         let nightLen  = max(nextSunriseJD - sunsetJD, 1.0 / 1440.0)
         let windowEnd = sunsetJD + nightLen / 5.0
-        let step: Double = 1.0 / 1440.0
-        var minutes = 0
-        var t = sunsetJD
-        while t < windowEnd {
-            let tithi = Int(wrapper.calculateTithiNumber(forJulianDay: t))
-            if tithi == 13 || tithi == 28 { minutes += 1 }
-            t += step
+        let windowMinutes = Int(((windowEnd - sunsetJD) * 1440.0).rounded())
+        guard windowMinutes > 0 else { return 0 }
+
+        func isTrayodashi(_ tithi: Int) -> Bool { tithi == 13 || tithi == 28 }
+
+        let atStart = Int(wrapper.calculateTithiNumber(forJulianDay: sunsetJD))
+        let atEnd   = Int(wrapper.calculateTithiNumber(forJulianDay: windowEnd))
+
+        // A tithi runs 19–26 hours and this window is a fifth of one night, so
+        // at most one tithi boundary can fall inside it. That makes the two
+        // end readings enough to classify the whole window: if they agree, that
+        // one tithi fills it, and if neither is Trayodashi, none of it is.
+        // Reading the ends first is what keeps this cheap — it settles the
+        // ~26 days a month where no Trayodashi is anywhere near dusk, in two
+        // ephemeris calls instead of one per minute.
+        if atStart == atEnd { return isTrayodashi(atStart) ? windowMinutes : 0 }
+        guard isTrayodashi(atStart) || isTrayodashi(atEnd) else { return 0 }
+
+        // Exactly one boundary inside: bisect to it (~8 calls to land inside a
+        // minute) rather than sampling all ~144 minutes. More precise than the
+        // sampling it replaces, not just faster.
+        var lo = sunsetJD
+        var hi = windowEnd
+        while hi - lo > 1.0 / 1440.0 {
+            let mid = (lo + hi) / 2.0
+            if Int(wrapper.calculateTithiNumber(forJulianDay: mid)) == atStart { lo = mid } else { hi = mid }
         }
-        return minutes
+        let boundary = (lo + hi) / 2.0
+        let held = isTrayodashi(atStart) ? boundary - sunsetJD : windowEnd - boundary
+        return max(0, Int((held * 1440.0).rounded()))
     }
 
     /// `trayodashiMinutesInPradosh` for the day starting at `jdDayStart`.
