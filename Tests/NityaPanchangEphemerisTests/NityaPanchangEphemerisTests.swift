@@ -248,4 +248,57 @@ final class NityaPanchangEphemerisTests: XCTestCase {
         let tithis = await repository.fetchMonthTithis(year: 2020, month: 2, latitude: latitude, longitude: longitude)
         XCTAssertEqual(try XCTUnwrap(tithis[6]).isPradoshVrat, true, "6 Feb 2020 should be Pradosh Vrat")
     }
+
+    /// Published dates for the festivals whose anchors moved, each of which
+    /// a sunrise reading gets wrong in at least one of these years.
+    ///
+    /// Makar Sankranti is solar — the Sun's entry into sidereal Makara — and
+    /// defers a day when the ingress lands after sunset, so it is not the
+    /// fixed 14 January it was modelled as. Karwa Chauth, Dhanteras and Diwali
+    /// are all dusk observances. Akshaya Tritiya is Madhyahna, one daylight
+    /// division earlier than Aparahna.
+    func testFestivalsWithMovedAnchorsMatchPublishedDates() async throws {
+        let repository: PanchaangRepository = EphemerisPanchaangRepository()
+        let cal = Calendar(identifier: .gregorian)
+
+        // year: [festival: (month, day)]
+        let expected: [Int: [String: (Int, Int)]] = [
+            2023: ["Makar Sankranti": (1, 15), "Karwa Chauth": (11, 1),  "Diwali": (11, 12),
+                   "Dhanteras": (11, 10), "Akshaya Tritiya": (4, 22)],
+            2024: ["Makar Sankranti": (1, 15), "Karwa Chauth": (10, 20), "Diwali": (10, 31),
+                   "Dhanteras": (10, 29), "Akshaya Tritiya": (5, 10)],
+            2025: ["Makar Sankranti": (1, 14), "Karwa Chauth": (10, 10), "Diwali": (10, 20),
+                   "Dhanteras": (10, 18), "Akshaya Tritiya": (4, 30)],
+            2026: ["Makar Sankranti": (1, 14), "Dhanteras": (11, 6),     "Akshaya Tritiya": (4, 19)],
+            2027: ["Makar Sankranti": (1, 15), "Karwa Chauth": (10, 18), "Diwali": (10, 29)],
+        ]
+
+        for (year, festivals) in expected {
+            let start = DateComponents(calendar: cal, year: year, month: 1, day: 1).date!
+            let end   = DateComponents(calendar: cal, year: year, month: 12, day: 31).date!
+            let found = await repository.fetchFestivals(from: start, to: end)
+
+            for (name, date) in festivals {
+                let match = found.first { $0.name == name }
+                XCTAssertNotNil(match, "\(year): \(name) missing entirely")
+                guard let match else { continue }
+                XCTAssertEqual(cal.component(.month, from: match.date), date.0, "\(year) \(name) month")
+                XCTAssertEqual(cal.component(.day,   from: match.date), date.1, "\(year) \(name) day")
+            }
+        }
+    }
+
+    /// Purnima vanished from the calendar on 23 Dec 2026: it is kshaya, with
+    /// the 23rd reading 29 at sunrise and the 24th already reading 1, so no
+    /// day carried 30 for the badge to match. The full moon still happens on
+    /// the day that held the tithi.
+    func testMonthTithisCarriesAKshayaPurnima() async throws {
+        let repository: PanchaangRepository = EphemerisPanchaangRepository()
+        let tithis = await repository.fetchMonthTithis(year: 2026, month: 12, latitude: latitude, longitude: longitude)
+
+        XCTAssertFalse(tithis.values.contains { $0.sunriseTithi == 30 },
+                       "Dec 2026 Purnima is kshaya — no sunrise should carry it")
+        XCTAssertEqual(try XCTUnwrap(tithis[23]).lostTithi, 30,
+                       "23 Dec 2026 held the lost Purnima")
+    }
 }

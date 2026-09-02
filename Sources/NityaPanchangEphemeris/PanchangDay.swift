@@ -230,6 +230,15 @@ public struct PanchangDay: Sendable {
 /// Lookup section disagreeing about the same day.
 public struct MonthDayTithis: Sendable {
     public let sunriseTithi: Int
+    /// A tithi that began after this day's sunrise and ended before the next,
+    /// so it reaches no sunrise anywhere and `sunriseTithi` cannot show it —
+    /// 0 when there is none.
+    ///
+    /// The calendar's Purnima and Amavasya badges need this or they silently
+    /// skip a fortnight: Purnima is lost this way on 23 Dec 2026, where the
+    /// 23rd reads 29 and the 24th already reads 1. The full or new moon still
+    /// happens on the day that held it, which is this day.
+    public let lostTithi: Int
     /// Whether Pradosh Vrat is kept on this day.
     ///
     /// Decided by how much Trayodashi falls inside each day's Pradosh Kaal
@@ -239,8 +248,9 @@ public struct MonthDayTithis: Sendable {
     /// of it.
     public let isPradoshVrat: Bool
 
-    public init(sunriseTithi: Int, isPradoshVrat: Bool) {
+    public init(sunriseTithi: Int, lostTithi: Int = 0, isPradoshVrat: Bool) {
         self.sunriseTithi = sunriseTithi
+        self.lostTithi = lostTithi
         self.isPradoshVrat = isPradoshVrat
     }
 }

@@ -481,8 +481,10 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         guard let first = cal.date(from: comps),
               let count = cal.range(of: .day, in: .month, for: first)?.count else { return [:] }
 
-        var sunrises = [Double](repeating: 0, count: count + 1)
-        for day in 1...count {
+        // One day past the month: the last day's lost-tithi check needs the
+        // sunrise after it to see what was skipped in between.
+        var sunrises = [Double](repeating: 0, count: count + 2)
+        for day in 1...(count + 1) {
             guard let date = cal.date(byAdding: .day, value: day - 1, to: first) else { continue }
             let jd        = wrapper.getJulianDayUTC(from: date)
             let sunData   = wrapper.calculateSunriseSunset(for: date, latitude: latitude, longitude: longitude)
@@ -504,8 +506,21 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
 
         var results: [Int: MonthDayTithis] = [:]
         for day in 1...count {
+            let tithi = Int(wrapper.calculateTithiNumber(forJulianDay: sunrises[day]))
+            // Tithis skipped between this sunrise and the next belong to this
+            // day, which held them. Only a gap of one or two is a real kshaya;
+            // anything wider is a vriddhi artifact — the same bound the
+            // festival fallback uses. Where two are lost at once, the one the
+            // calendar can actually draw wins.
+            let nextTithi = Int(wrapper.calculateTithiNumber(forJulianDay: sunrises[day + 1]))
+            let gap = ((nextTithi - tithi - 1) % 30 + 30) % 30
+            let skipped = (1...2).contains(gap)
+                ? (1...gap).map { ((tithi - 1 + $0) % 30) + 1 }
+                : []
+
             results[day] = MonthDayTithis(
-                sunriseTithi: Int(wrapper.calculateTithiNumber(forJulianDay: sunrises[day])),
+                sunriseTithi: tithi,
+                lostTithi: skipped.first { $0 == 15 || $0 == 30 } ?? skipped.first ?? 0,
                 isPradoshVrat: isPradoshDay(own: overlap[day + 1], previous: overlap[day], next: overlap[day + 2])
             )
         }
@@ -542,12 +557,12 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             var cachedMidnightTithi: Int?
             var cachedMidnightMonth: Int?
             var cachedMidnightAdhik: Bool?
-            var cachedPradoshTithi: Int?
-            var cachedPradoshMonth: Int?
-            var cachedPradoshAdhik: Bool?
             var cachedAparahnaTithi: Int?
             var cachedAparahnaMonth: Int?
             var cachedAparahnaAdhik: Bool?
+            var cachedMadhyahnaTithi: Int?
+            var cachedMadhyahnaMonth: Int?
+            var cachedMadhyahnaAdhik: Bool?
 
             // 3. Evaluate Rules
             for rule in allFestivalRules {
@@ -583,27 +598,49 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 case .pradoshKaal:
                     guard nearSunrise() else { continue }
 
-                    if cachedPradoshTithi == nil {
+                    // Overlap with the window, not a reading at its midpoint.
+                    // Diwali 2027 is the case that forces this: Amavasya covers
+                    // 17:51–19:07 on 29 Oct and the midpoint sample sits at
+                    // 19:07, the very minute it ends, so no day matched at all
+                    // and Diwali vanished from that year.
+                    let jdDayStart = wrapper.getJulianDayUTC(from: startOfDay)
+                    let own = pradoshOverlapOfTithi(jdDayStart: jdDayStart, tithi: rule.tithiNumber)
+                    guard own > 0 else { continue }
+                    // A tithi normally reaches two consecutive windows; the
+                    // festival belongs to whichever holds more of it. Only the
+                    // next day needs checking: the scan runs forward and `seen`
+                    // keeps the first match of the year, so losing to the next
+                    // day here is what lets that day win instead.
+                    guard own >= pradoshOverlapOfTithi(jdDayStart: jdDayStart + 1.0,
+                                                        tithi: rule.tithiNumber) else { continue }
+
+                    let anchor = anchorAtTithiInPradosh(jdDayStart: jdDayStart, tithi: rule.tithiNumber)
+                    activeTithi = anchor.tithi
+                    activeMonth = anchor.month
+                    isAdhik     = anchor.isAdhik
+
+                case .madhyahna:
+                    guard nearSunrise() else { continue }
+
+                    if cachedMadhyahnaTithi == nil {
                         let sunData      = wrapper.calculateSunriseSunset(
                             for: startOfDay, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
-                        let sunsetJD     = sunData["sunsetJD"] as? Double ?? jdSunrise
-                        let nextDayStart = cal.date(byAdding: .day, value: 1, to: startOfDay)!
-                        let nextSunData  = wrapper.calculateSunriseSunset(
-                            for: nextDayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
-                        let nextSunriseJD = nextSunData["sunriseJD"] as? Double ?? (sunsetJD + 0.5)
+                        let sunriseRefJD = sunData["sunriseJD"] as? Double ?? jdSunrise
+                        let sunsetRefJD  = sunData["sunsetJD"]  as? Double ?? (sunriseRefJD + 0.5)
 
-                        // Pradosh Kaal: the first fifth of the night (sunset → next sunrise),
-                        // sampled at its midpoint.
-                        let nightLen  = max(nextSunriseJD - sunsetJD, 1.0 / 1440.0)
-                        let jdPradosh = sunsetJD + nightLen / 10.0
-                        cachedPradoshTithi = Int(wrapper.calculateTithiNumber(forJulianDay: jdPradosh))
-                        cachedPradoshMonth = Int(wrapper.calculatePurnimantaMonth(forJulianDay: jdPradosh))
-                        cachedPradoshAdhik = wrapper.calculateIsAdhikMaas(forJulianDay: jdPradosh)
+                        // Madhyahna Kaal: the third of five equal divisions of
+                        // daylight, sampled at its midpoint — one division
+                        // earlier than Aparahna.
+                        let dayLen       = max(sunsetRefJD - sunriseRefJD, 1.0 / 1440.0)
+                        let jdMadhyahna  = sunriseRefJD + dayLen * 2.5 / 5.0
+                        cachedMadhyahnaTithi = Int(wrapper.calculateTithiNumber(forJulianDay: jdMadhyahna))
+                        cachedMadhyahnaMonth = Int(wrapper.calculatePurnimantaMonth(forJulianDay: jdMadhyahna))
+                        cachedMadhyahnaAdhik = wrapper.calculateIsAdhikMaas(forJulianDay: jdMadhyahna)
                     }
 
-                    activeTithi = cachedPradoshTithi!
-                    activeMonth = cachedPradoshMonth!
-                    isAdhik = cachedPradoshAdhik!
+                    activeTithi = cachedMadhyahnaTithi!
+                    activeMonth = cachedMadhyahnaMonth!
+                    isAdhik = cachedMadhyahnaAdhik!
 
                 case .aparahna:
                     guard nearSunrise() else { continue }
@@ -669,6 +706,18 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
 
         festivals += kshayaFallbackFestivals(from: startDate, to: endDate, seen: &seen)
         festivals += holiFestivals(from: startDate, to: endDate, seen: &seen)
+
+        // Makar Sankranti, for every year the window touches — solar, so it
+        // cannot come from either the tithi table or the fixed-date table.
+        let windowStart = cal.startOfDay(for: startDate)
+        let windowEnd   = cal.startOfDay(for: endDate)
+        for year in cal.component(.year, from: startDate)...cal.component(.year, from: endDate) {
+            guard let date = makarSankranti(year: year),
+                  date >= windowStart, date <= windowEnd,
+                  seen.insert("Makar Sankranti-\(year)").inserted else { continue }
+            festivals.append(HinduFestival(name: "Makar Sankranti", date: date, emoji: "🌾", hasIcon: false))
+        }
+
         return festivals.sorted { $0.date < $1.date }
     }
 
@@ -924,6 +973,101 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     /// tomorrow — the asymmetry is what sends a tie to the later day.
     private func isPradoshDay(own: Int, previous: Int, next: Int) -> Bool {
         own > 0 && own >= previous && own > next
+    }
+
+    /// Minutes of `tithi` falling inside the Pradosh Kaal window of the day
+    /// starting at `jdDayStart`, at the Ujjain reference the other festival
+    /// anchors use.
+    ///
+    /// Classified from the two window ends and bisected only when a boundary
+    /// is inside — the same shape as `trayodashiMinutesInPradosh`, which does
+    /// this for Pradosh Vrat at the caller's own location. A tithi is far
+    /// longer than this window, so at most one boundary can fall in it.
+    private func pradoshOverlapOfTithi(jdDayStart: Double, tithi: Int) -> Int {
+        let dayStart = jdToDate(jdDayStart)
+        let sunData = wrapper.calculateSunriseSunset(for: dayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        guard let sunsetJD = sunData["sunsetJD"] as? Double else { return 0 }
+        let nextSunData = wrapper.calculateSunriseSunset(for: jdToDate(jdDayStart + 1.0), latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        guard let nextSunriseJD = nextSunData["sunriseJD"] as? Double else { return 0 }
+
+        let nightLen      = max(nextSunriseJD - sunsetJD, 1.0 / 1440.0)
+        let windowEnd     = sunsetJD + nightLen / 5.0
+        let windowMinutes = Int(((windowEnd - sunsetJD) * 1440.0).rounded())
+        guard windowMinutes > 0 else { return 0 }
+
+        let atStart = Int(wrapper.calculateTithiNumber(forJulianDay: sunsetJD))
+        let atEnd   = Int(wrapper.calculateTithiNumber(forJulianDay: windowEnd))
+        if atStart == atEnd { return atStart == tithi ? windowMinutes : 0 }
+        guard atStart == tithi || atEnd == tithi else { return 0 }
+
+        var lo = sunsetJD
+        var hi = windowEnd
+        while hi - lo > 1.0 / 1440.0 {
+            let mid = (lo + hi) / 2.0
+            if Int(wrapper.calculateTithiNumber(forJulianDay: mid)) == atStart { lo = mid } else { hi = mid }
+        }
+        let boundary = (lo + hi) / 2.0
+        let held = atStart == tithi ? boundary - sunsetJD : windowEnd - boundary
+        return max(0, Int((held * 1440.0).rounded()))
+    }
+
+    /// The anchor to match a Pradosh festival against, read where `tithi`
+    /// actually sits inside the window rather than at a fixed point — so the
+    /// lunar month travels with the tithi that qualified, not with whatever
+    /// happens to occupy the midpoint.
+    private func anchorAtTithiInPradosh(jdDayStart: Double, tithi: Int) -> (tithi: Int, month: Int, isAdhik: Bool) {
+        let sunData = wrapper.calculateSunriseSunset(for: jdToDate(jdDayStart), latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        guard let sunsetJD = sunData["sunsetJD"] as? Double else { return anchor(at: jdDayStart) }
+        let nextSunData = wrapper.calculateSunriseSunset(for: jdToDate(jdDayStart + 1.0), latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        let nextSunriseJD = nextSunData["sunriseJD"] as? Double ?? (sunsetJD + 0.5)
+        let windowEnd = sunsetJD + max(nextSunriseJD - sunsetJD, 1.0 / 1440.0) / 5.0
+        let at = Int(wrapper.calculateTithiNumber(forJulianDay: sunsetJD)) == tithi ? sunsetJD : windowEnd
+        return anchor(at: at)
+    }
+
+    private func anchor(at jd: Double) -> (tithi: Int, month: Int, isAdhik: Bool) {
+        (Int(wrapper.calculateTithiNumber(forJulianDay: jd)),
+         Int(wrapper.calculatePurnimantaMonth(forJulianDay: jd)),
+         wrapper.calculateIsAdhikMaas(forJulianDay: jd))
+    }
+
+    /// Makar Sankranti — the Sun's entry into sidereal Makara (Capricorn).
+    ///
+    /// Solar, not lunar, and not the fixed 14 January it used to be modelled
+    /// as: precession moves the ingress about a day per century, and the
+    /// observance falls on the next day whenever the Sankranti itself lands
+    /// after sunset, since its punya kaal must be in daylight. That is what
+    /// makes 2027 the 15th while 2025 and 2026 are the 14th.
+    ///
+    /// Verified against the ephemeris for 2024–2031, which reproduces every
+    /// published date: 2024 15 Jan, 2025 14, 2026 14, 2027 15, 2028 15,
+    /// 2029 14, 2030 14, 2031 15.
+    private func makarSankranti(year: Int) -> Date? {
+        let cal = Calendar.current
+        guard let from = cal.date(from: DateComponents(year: year, month: 1, day: 10)),
+              let to   = cal.date(from: DateComponents(year: year, month: 1, day: 20)) else { return nil }
+
+        // Bisect the Sun's sidereal longitude onto 270°. The ingress is always
+        // inside this window, and the longitude rises monotonically across it.
+        func sunLongitude(_ jd: Double) -> Double {
+            let raw = wrapper.calculatePlanetPositions(forJulianDay: jd) as? [[String: Any]] ?? []
+            return raw.first(where: { ($0["planetIndex"] as? Int) == 0 })?["longitude"] as? Double ?? 0
+        }
+        var lo = wrapper.getJulianDayUTC(from: from)
+        var hi = wrapper.getJulianDayUTC(from: to)
+        while hi - lo > 1.0 / 86_400.0 {
+            let mid = (lo + hi) / 2.0
+            if sunLongitude(mid) < 270.0 { lo = mid } else { hi = mid }
+        }
+        let ingressJD = (lo + hi) / 2.0
+
+        let ingressDayStart = cal.startOfDay(for: jdToDate(ingressJD))
+        let sunData = wrapper.calculateSunriseSunset(for: ingressDayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        // After sunset, the punya kaal has no daylight left — it defers a day.
+        if let sunsetJD = sunData["sunsetJD"] as? Double, ingressJD > sunsetJD {
+            return cal.date(byAdding: .day, value: 1, to: ingressDayStart)
+        }
+        return ingressDayStart
     }
 
     // MARK: - Eclipses (always called from `queue`)

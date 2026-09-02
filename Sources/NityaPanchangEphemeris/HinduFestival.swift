@@ -15,6 +15,10 @@ public enum ObservationTime: Sendable {
                      // fifth of the night after sunset (Pradosh-vyapini)
     case aparahna    // For Dussehra/Vijayadashami — the tithi must prevail in the fourth
                      // of five equal divisions of daylight (Aparahna-vyapini)
+    case madhyahna   // For Akshaya Tritiya — the THIRD of the five divisions, so midday
+                     // rather than afternoon. One division apart from Aparahna, which is
+                     // enough to pick a different day whenever the tithi turns over
+                     // between the two.
 }
 
 // MARK: - Festival Entity
@@ -85,19 +89,24 @@ public let allFestivalRules: [FestivalRule] = [
     ),
 
     // ── Vaishakha (2) ─────────────────────────────────────────────────────────
+    // Madhyahna, not sunrise: Tritiya at midday is what dates these. In 2026
+    // it reaches sunrise only on 20 Apr but holds midday on the 19th, and 2023
+    // splits the same way.
     FestivalRule(
         name: "Akshaya Tritiya",
         emoji: "gold-pot",
         lunarMonth: 2,
         tithiNumber: 18,
-        hasIcon: true
+        hasIcon: true,
+        observationTime: .madhyahna
     ),
     FestivalRule(
         name: "Parshuram Jayanti",
         emoji: "axe",
         lunarMonth: 2,
         tithiNumber: 18,
-        hasIcon: true
+        hasIcon: true,
+        observationTime: .madhyahna
     ),
     FestivalRule(
         name: "Buddha Purnima",
@@ -200,14 +209,22 @@ public let allFestivalRules: [FestivalRule] = [
     FestivalRule(name: "Sharad Purnima",       emoji: "🌝", lunarMonth: 7,  tithiNumber: 30),
 
     // ── Kartika (8) ── [KP = Diwali week] + [SP → Kartik Purnima] ────────────
-    FestivalRule(name: "Karwa Chauth",         emoji: "🌝", lunarMonth: 8,  tithiNumber: 4),
+    // Pradosh, not sunrise: the whole observance is the evening moon sighting,
+    // so the day is the one whose dusk holds Chaturthi. In 2027 Chaturthi runs
+    // 18 Oct 17:53 to 19 Oct 16:43 — it fills the 18th's window and is long
+    // gone before the 19th's, while the sunrise reading pointed at the 19th.
+    FestivalRule(name: "Karwa Chauth",         emoji: "🌝", lunarMonth: 8,  tithiNumber: 4,
+                 observationTime: .pradoshKaal),
     FestivalRule(name: "Ahoi Ashtami",         emoji: "⭐", lunarMonth: 8,  tithiNumber: 8),
+    // Pradosh: the Dhanteras puja is at dusk, like Diwali two days later.
+    // Sunrise put it a day late in 2023, 2024, 2025 and 2026 alike.
     FestivalRule(
         name: "Dhanteras",
         emoji: "dhanteras",
         lunarMonth: 8,
         tithiNumber: 13,
-        hasIcon: true
+        hasIcon: true,
+        observationTime: .pradoshKaal
     ),
     FestivalRule(name: "Narak Chaturdashi",    emoji: "🪔", lunarMonth: 8,  tithiNumber: 14),
     FestivalRule(
@@ -346,7 +363,9 @@ public struct StaticFestivalRule: Sendable {
 public let allStaticFestivalRules: [StaticFestivalRule] = [
     StaticFestivalRule(name: "New Year's Day",   emoji: "🎆", month: 1,  day: 1),
     StaticFestivalRule(name: "Lohri",            emoji: "🔥", month: 1,  day: 13),
-    StaticFestivalRule(name: "Makar Sankranti",  emoji: "🌾", month: 1,  day: 14),
+    // Makar Sankranti is NOT here: it is solar, not a fixed Gregorian date.
+    // See EphemerisPanchaangRepository.makarSankranti(year:).
+
     StaticFestivalRule(name: "Republic Day",     emoji: "🇮🇳", month: 1,  day: 26),
     StaticFestivalRule(name: "Ambedkar Jayanti", emoji: "📜", month: 4,  day: 14),
     StaticFestivalRule(name: "Independence Day", emoji: "🇮🇳", month: 8,  day: 15),
