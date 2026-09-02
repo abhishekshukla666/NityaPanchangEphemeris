@@ -707,15 +707,33 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         festivals += kshayaFallbackFestivals(from: startDate, to: endDate, seen: &seen)
         festivals += holiFestivals(from: startDate, to: endDate, seen: &seen)
 
-        // Makar Sankranti, for every year the window touches — solar, so it
-        // cannot come from either the tithi table or the fixed-date table.
+        // Festivals no tithi rule can express: two solar ingresses under
+        // different conventions, and one Gregorian computus.
         let windowStart = cal.startOfDay(for: startDate)
         let windowEnd   = cal.startOfDay(for: endDate)
         for year in cal.component(.year, from: startDate)...cal.component(.year, from: endDate) {
-            guard let date = makarSankranti(year: year),
-                  date >= windowStart, date <= windowEnd,
-                  seen.insert("Makar Sankranti-\(year)").inserted else { continue }
-            festivals.append(HinduFestival(name: "Makar Sankranti", date: date, emoji: "🌾", hasIcon: false))
+            let mesha = solarIngressJD(year: year, month: 4, day: 8, targetLongitude: 0)
+            var computed: [(String, Date, String)] = []
+
+            if let jd = solarIngressJD(year: year, month: 1, day: 10, targetLongitude: 270) {
+                computed.append(("Makar Sankranti", sankrantiDeferringPastSunset(ingressJD: jd), "🌾"))
+            }
+            if let jd = solarIngressJD(year: year, month: 9, day: 12, targetLongitude: 150) {
+                computed.append(("Vishwakarma Puja", sankrantiDeferringPastSunset(ingressJD: jd), "🛠️"))
+            }
+            if let jd = mesha {
+                computed.append(("Baisakhi",        sankrantiByHinduDay(ingressJD: jd), "🌾"))
+                computed.append(("Solar New Year",  sankrantiByHinduDay(ingressJD: jd), "☀️"))
+            }
+            if let date = goodFriday(year: year) {
+                computed.append(("Good Friday", date, "✝️"))
+            }
+
+            for (name, date, emoji) in computed {
+                guard date >= windowStart, date <= windowEnd,
+                      seen.insert("\(name)-\(year)").inserted else { continue }
+                festivals.append(HinduFestival(name: name, date: date, emoji: emoji, hasIcon: false))
+            }
         }
 
         return festivals.sorted { $0.date < $1.date }
@@ -1031,24 +1049,17 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
          wrapper.calculateIsAdhikMaas(forJulianDay: jd))
     }
 
-    /// Makar Sankranti — the Sun's entry into sidereal Makara (Capricorn).
+    /// The instant the Sun reaches `targetLongitude` sidereally, bisected
+    /// inside a ten-day window opening on `month`/`day`, across which the
+    /// longitude rises monotonically.
     ///
-    /// Solar, not lunar, and not the fixed 14 January it used to be modelled
-    /// as: precession moves the ingress about a day per century, and the
-    /// observance falls on the next day whenever the Sankranti itself lands
-    /// after sunset, since its punya kaal must be in daylight. That is what
-    /// makes 2027 the 15th while 2025 and 2026 are the 14th.
-    ///
-    /// Verified against the ephemeris for 2024–2031, which reproduces every
-    /// published date: 2024 15 Jan, 2025 14, 2026 14, 2027 15, 2028 15,
-    /// 2029 14, 2030 14, 2031 15.
-    private func makarSankranti(year: Int) -> Date? {
+    /// The wrap handling matters for Mesha, whose target is 0°: without it the
+    /// comparison would read the Sun at 359° as being past the target.
+    private func solarIngressJD(year: Int, month: Int, day: Int, targetLongitude: Double) -> Double? {
         let cal = Calendar.current
-        guard let from = cal.date(from: DateComponents(year: year, month: 1, day: 10)),
-              let to   = cal.date(from: DateComponents(year: year, month: 1, day: 20)) else { return nil }
+        guard let from = cal.date(from: DateComponents(year: year, month: month, day: day)),
+              let to   = cal.date(byAdding: .day, value: 10, to: from) else { return nil }
 
-        // Bisect the Sun's sidereal longitude onto 270°. The ingress is always
-        // inside this window, and the longitude rises monotonically across it.
         func sunLongitude(_ jd: Double) -> Double {
             let raw = wrapper.calculatePlanetPositions(forJulianDay: jd) as? [[String: Any]] ?? []
             return raw.first(where: { ($0["planetIndex"] as? Int) == 0 })?["longitude"] as? Double ?? 0
@@ -1057,17 +1068,75 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         var hi = wrapper.getJulianDayUTC(from: to)
         while hi - lo > 1.0 / 86_400.0 {
             let mid = (lo + hi) / 2.0
-            if sunLongitude(mid) < 270.0 { lo = mid } else { hi = mid }
+            var delta = sunLongitude(mid) - targetLongitude
+            if delta < -180 { delta += 360 }
+            if delta >  180 { delta -= 360 }
+            if delta < 0 { lo = mid } else { hi = mid }
         }
-        let ingressJD = (lo + hi) / 2.0
+        return (lo + hi) / 2.0
+    }
 
+    /// Makar Sankranti and Vishwakarma Puja: the ingress day, or the next one
+    /// when the Sankranti itself falls after sunset, its punya kaal needing
+    /// daylight.
+    ///
+    /// Reproduces Makar Sankranti 2024 15 Jan, 2025 14, 2026 14, 2027 15,
+    /// 2028 15, 2029 14, 2030 14, 2031 15, and Vishwakarma Puja on
+    /// 17 September through 2023–2027.
+    private func sankrantiDeferringPastSunset(ingressJD: Double) -> Date {
+        let cal = Calendar.current
         let ingressDayStart = cal.startOfDay(for: jdToDate(ingressJD))
         let sunData = wrapper.calculateSunriseSunset(for: ingressDayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
-        // After sunset, the punya kaal has no daylight left — it defers a day.
         if let sunsetJD = sunData["sunsetJD"] as? Double, ingressJD > sunsetJD {
-            return cal.date(byAdding: .day, value: 1, to: ingressDayStart)
+            return cal.date(byAdding: .day, value: 1, to: ingressDayStart) ?? ingressDayStart
         }
         return ingressDayStart
+    }
+
+    /// Baisakhi and the solar new year: the *Hindu* day holding the ingress,
+    /// which runs sunrise to sunrise rather than midnight to midnight.
+    ///
+    /// Deliberately not the rule above. Mesha Sankranti fell at 03:21 on
+    /// 14 Apr 2025 and Baisakhi was kept on the 13th, because 03:21 still
+    /// belongs to the day that began at the 13th's sunrise. Reproduces
+    /// 2023 14 Apr, 2024 13 Apr, 2025 13 Apr, where deferring past sunset
+    /// instead would miss both 2024 and 2025.
+    private func sankrantiByHinduDay(ingressJD: Double) -> Date {
+        let cal = Calendar.current
+        let clockDayStart = cal.startOfDay(for: jdToDate(ingressJD))
+        let sunData = wrapper.calculateSunriseSunset(for: clockDayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        if let sunriseJD = sunData["sunriseJD"] as? Double, ingressJD < sunriseJD {
+            return cal.date(byAdding: .day, value: -1, to: clockDayStart) ?? clockDayStart
+        }
+        return clockDayStart
+    }
+
+    /// Good Friday — the Friday before Easter, by the Gregorian computus.
+    ///
+    /// Neither solar nor lunar in this calendar's sense: Easter is the first
+    /// Sunday after the ecclesiastical full moon on or after 21 March,
+    /// computed from tables rather than from an ephemeris, so it cannot come
+    /// from a tithi rule. Gives 2023 7 Apr, 2024 29 Mar, 2025 18 Apr,
+    /// 2026 3 Apr, 2027 26 Mar.
+    private func goodFriday(year: Int) -> Date? {
+        let a = year % 19
+        let b = year / 100
+        let c = year % 100
+        let d = b / 4
+        let e = b % 4
+        let f = (b + 8) / 25
+        let g = (b - f + 1) / 3
+        let h = (19 * a + b - d - g + 15) % 30
+        let i = c / 4
+        let k = c % 4
+        let l = (32 + 2 * e + 2 * i - h - k) % 7
+        let m = (a + 11 * h + 22 * l) / 451
+        let month = (h + l - 7 * m + 114) / 31        // 3 = March, 4 = April
+        let day   = ((h + l - 7 * m + 114) % 31) + 1
+
+        let cal = Calendar.current
+        guard let easter = cal.date(from: DateComponents(year: year, month: month, day: day)) else { return nil }
+        return cal.date(byAdding: .day, value: -2, to: easter)   // Easter Sunday → Good Friday
     }
 
     // MARK: - Eclipses (always called from `queue`)

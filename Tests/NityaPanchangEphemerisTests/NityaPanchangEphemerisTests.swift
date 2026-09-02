@@ -1,5 +1,6 @@
 import XCTest
 @testable import NityaPanchangEphemeris
+import SwissEphWrapper
 
 final class NityaPanchangEphemerisTests: XCTestCase {
 
@@ -300,5 +301,74 @@ final class NityaPanchangEphemerisTests: XCTestCase {
                        "Dec 2026 Purnima is kshaya — no sunrise should carry it")
         XCTAssertEqual(try XCTUnwrap(tithis[23]).lostTithi, 30,
                        "23 Dec 2026 held the lost Purnima")
+    }
+
+    /// The nine festivals added across four dating mechanisms, against
+    /// published dates.
+    ///
+    /// Saraswati Puja 2025 is deliberately absent: Magha Shukla Panchami is
+    /// kshaya that year and the published date is 2 Feb, but this engine
+    /// returns 3 Feb. That is not a fault in the rule — Basant Panchami, which
+    /// has always shared it, returns 3 Feb too. See
+    /// `testSunriseProxyMissesATithiThatEndsBeforeRealSunrise`.
+    func testNineAddedFestivalsMatchPublishedDates() async throws {
+        let repository: PanchaangRepository = EphemerisPanchaangRepository()
+        let cal = Calendar(identifier: .gregorian)
+
+        let expected: [Int: [String: (Int, Int)]] = [
+            2023: ["Good Friday": (4, 7),   "Baisakhi": (4, 14), "Solar New Year": (4, 14),
+                   "Vishwakarma Puja": (9, 17), "Shivaji Jayanti": (2, 19),
+                   "Vishveshvaraya Jayanti": (9, 15)],
+            2024: ["Good Friday": (3, 29),  "Baisakhi": (4, 13), "Solar New Year": (4, 13),
+                   "Vishwakarma Puja": (9, 17), "Shankaracharya Jayanti": (5, 12),
+                   "Surdas Jayanti": (5, 12), "Saraswati Puja": (2, 14)],
+            2025: ["Good Friday": (4, 18),  "Baisakhi": (4, 13), "Solar New Year": (4, 13),
+                   "Vishwakarma Puja": (9, 17), "Shankaracharya Jayanti": (5, 2),
+                   "Surdas Jayanti": (5, 2)],
+            2026: ["Good Friday": (4, 3),   "Vishwakarma Puja": (9, 17),
+                   "Saraswati Puja": (1, 23)],
+            2027: ["Good Friday": (3, 26),  "Vishwakarma Puja": (9, 17)],
+        ]
+
+        for (year, festivals) in expected {
+            let start = DateComponents(calendar: cal, year: year, month: 1, day: 1).date!
+            let end   = DateComponents(calendar: cal, year: year, month: 12, day: 31).date!
+            let found = await repository.fetchFestivals(from: start, to: end)
+
+            for (name, date) in festivals {
+                let match = found.first { $0.name == name }
+                XCTAssertNotNil(match, "\(year): \(name) missing entirely")
+                guard let match else { continue }
+                XCTAssertEqual(cal.component(.month, from: match.date), date.0, "\(year) \(name) month")
+                XCTAssertEqual(cal.component(.day,   from: match.date), date.1, "\(year) \(name) day")
+            }
+        }
+    }
+
+    /// Known defect, pinned so it is not mistaken for a rule problem.
+    ///
+    /// The festival scan reads the tithi at 06:00 local as a stand-in for
+    /// sunrise. Real sunrise at Ujjain on 3 Feb 2025 is 07:05, and Magha
+    /// Shukla Panchami ends in between: the proxy sees tithi 20 and matches
+    /// the day, while the real sunrise sees 21. The tithi therefore reaches no
+    /// sunrise at all that fortnight and should fall to the kshaya fallback,
+    /// which would date it 2 Feb as published. Every sunrise-observed festival
+    /// whose tithi turns over in that pre-dawn hour is exposed to this.
+    func testSunriseProxyMissesATithiThatEndsBeforeRealSunrise() throws {
+        let wrapper = SwissEphWrapper()
+        let cal = Calendar(identifier: .gregorian)
+        var comps = DateComponents()
+        comps.timeZone = TimeZone(identifier: "Asia/Kolkata")
+        comps.year = 2025; comps.month = 2; comps.day = 3
+        let dayStart = try XCTUnwrap(cal.date(from: comps))
+
+        let proxyJD = wrapper.getJulianDayUTC(from: dayStart.addingTimeInterval(6 * 3600))
+        let sun = wrapper.calculateSunriseSunset(for: dayStart, latitude: latitude, longitude: longitude)
+        let realJD = try XCTUnwrap(sun["sunriseJD"] as? Double)
+
+        XCTAssertEqual(Int(wrapper.calculateTithiNumber(forJulianDay: proxyJD)), 20,
+                       "the 06:00 proxy still reads Panchami")
+        XCTAssertEqual(Int(wrapper.calculateTithiNumber(forJulianDay: realJD)), 21,
+                       "real sunrise is already past it — so Panchami touches no sunrise")
     }
 }

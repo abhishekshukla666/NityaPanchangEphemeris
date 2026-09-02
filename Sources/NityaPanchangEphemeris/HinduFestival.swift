@@ -116,6 +116,10 @@ public let allFestivalRules: [FestivalRule] = [
         hasIcon: true
     ),
 
+    // Vaishakha Shukla Panchami, shared by both (2024 12 May, 2025 2 May).
+    FestivalRule(name: "Shankaracharya Jayanti", emoji: "🕉️", lunarMonth: 2, tithiNumber: 20),
+    FestivalRule(name: "Surdas Jayanti",        emoji: "🎵", lunarMonth: 2, tithiNumber: 20),
+
     // ── Jyeshtha (3) ──────────────────────────────────────────────────────────
     FestivalRule(name: "Vat Savitri Vrat",     emoji: "🌳", lunarMonth: 3,  tithiNumber: 15),
     FestivalRule(name: "Ganga Dussehra",       emoji: "🌊", lunarMonth: 3,  tithiNumber: 25),
@@ -277,6 +281,9 @@ public let allFestivalRules: [FestivalRule] = [
         tithiNumber: 20,
         hasIcon: true
     ),
+    // The same day under its other name — Vasant Panchami is when Saraswati
+    // is worshipped.
+    FestivalRule(name: "Saraswati Puja",       emoji: "📖", lunarMonth: 11, tithiNumber: 20),
     FestivalRule(name: "Ratha Saptami",        emoji: "☀️", lunarMonth: 11, tithiNumber: 22),
     FestivalRule(name: "Magha Purnima",        emoji: "🌝", lunarMonth: 11, tithiNumber: 30),
 
@@ -373,8 +380,14 @@ public let allStaticFestivalRules: [StaticFestivalRule] = [
     // See EphemerisPanchaangRepository.makarSankranti(year:).
 
     StaticFestivalRule(name: "Republic Day",     emoji: "🇮🇳", month: 1,  day: 26),
+    // Observed on the Gregorian date by the Maharashtra government, which is
+    // how it is printed on calendars; the tithi reckoning (Phalguna Krishna
+    // Tritiya) is a separate observance and not what most people look for.
+    StaticFestivalRule(name: "Shivaji Jayanti",  emoji: "🚩", month: 2,  day: 19),
     StaticFestivalRule(name: "Ambedkar Jayanti", emoji: "📜", month: 4,  day: 14),
     StaticFestivalRule(name: "Independence Day", emoji: "🇮🇳", month: 8,  day: 15),
+    // Engineer's Day — Sir M. Visvesvaraya's birth anniversary, a fixed date.
+    StaticFestivalRule(name: "Vishveshvaraya Jayanti", emoji: "⚙️", month: 9, day: 15),
     StaticFestivalRule(name: "Gandhi Jayanti",   emoji: "🕊️", month: 10, day: 2),
     StaticFestivalRule(name: "Children's Day",   emoji: "🧒", month: 11, day: 14),
     StaticFestivalRule(name: "Christmas",        emoji: "🎄", month: 12, day: 25),
