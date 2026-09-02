@@ -215,7 +215,13 @@ public let allFestivalRules: [FestivalRule] = [
     // gone before the 19th's, while the sunrise reading pointed at the 19th.
     FestivalRule(name: "Karwa Chauth",         emoji: "🌝", lunarMonth: 8,  tithiNumber: 4,
                  observationTime: .pradoshKaal),
-    FestivalRule(name: "Ahoi Ashtami",         emoji: "⭐", lunarMonth: 8,  tithiNumber: 8),
+    FestivalRule(
+        name: "Ahoi Ashtami",
+        emoji: "⭐",
+        lunarMonth: 8,
+        tithiNumber: 8,
+        observationTime: .pradoshKaal
+    ),
     // Pradosh: the Dhanteras puja is at dusk, like Diwali two days later.
     // Sunrise put it a day late in 2023, 2024, 2025 and 2026 alike.
     FestivalRule(
