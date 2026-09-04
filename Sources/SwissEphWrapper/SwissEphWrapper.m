@@ -435,7 +435,10 @@ static void getAmantaMonthDetails(SwissEphWrapper *self, double jd, int *monthIn
 
 - (NSArray<NSDictionary *> *)calculatePlanetPositionsForJulianDay:(double)jd {
     swe_set_sid_mode(SE_SIDM_LAHIRI, 0, 0);
-    long flags = SEFLG_SWIEPH | SEFLG_SIDEREAL;
+    // SEFLG_SPEED fills pos[3] with daily motion in longitude. A negative
+    // value is Vakri (retrograde) — apparent backward motion against the
+    // zodiac. Without the flag pos[3] is not populated.
+    long flags = SEFLG_SWIEPH | SEFLG_SIDEREAL | SEFLG_SPEED;
     char errorMessage[256];
     NSMutableArray *result = [NSMutableArray arrayWithCapacity:9];
 
@@ -451,10 +454,11 @@ static void getAmantaMonthDetails(SwissEphWrapper *self, double jd, int *monthIn
         int rashi = (int)(lon / 30.0) + 1;
         double deg = fmod(lon, 30.0);
         [result addObject:@{
-            @"planetIndex": @(i),
-            @"longitude":   @(lon),
-            @"rashiNumber": @(rashi),
-            @"degrees":     @(deg)
+            @"planetIndex":  @(i),
+            @"longitude":    @(lon),
+            @"rashiNumber":  @(rashi),
+            @"degrees":      @(deg),
+            @"isRetrograde": @(pos[3] < 0)
         }];
     }
 
@@ -465,21 +469,28 @@ static void getAmantaMonthDetails(SwissEphWrapper *self, double jd, int *monthIn
     while (rahuLon <   0) rahuLon += 360.0;
     while (rahuLon >= 360) rahuLon -= 360.0;
     int rahuRashi = (int)(rahuLon / 30.0) + 1;
+    // The mean node always moves backward, so Rahu is perpetually Vakri.
+    // Read from the computed speed rather than hard-coded, so it stays true
+    // to whatever node model the flags select.
+    BOOL rahuRetrograde = rahuPos[3] < 0;
     [result addObject:@{
-        @"planetIndex": @(7),
-        @"longitude":   @(rahuLon),
-        @"rashiNumber": @(rahuRashi),
-        @"degrees":     @(fmod(rahuLon, 30.0))
+        @"planetIndex":  @(7),
+        @"longitude":    @(rahuLon),
+        @"rashiNumber":  @(rahuRashi),
+        @"degrees":      @(fmod(rahuLon, 30.0)),
+        @"isRetrograde": @(rahuRetrograde)
     }];
 
     // Ketu — South Node = Rahu + 180° (index 8)
     double ketuLon = fmod(rahuLon + 180.0, 360.0);
     int ketuRashi = (int)(ketuLon / 30.0) + 1;
+    // Ketu is Rahu's opposite point, so it shares Rahu's direction.
     [result addObject:@{
-        @"planetIndex": @(8),
-        @"longitude":   @(ketuLon),
-        @"rashiNumber": @(ketuRashi),
-        @"degrees":     @(fmod(ketuLon, 30.0))
+        @"planetIndex":  @(8),
+        @"longitude":    @(ketuLon),
+        @"rashiNumber":  @(ketuRashi),
+        @"degrees":      @(fmod(ketuLon, 30.0)),
+        @"isRetrograde": @(rahuRetrograde)
     }];
 
     return [result copy];

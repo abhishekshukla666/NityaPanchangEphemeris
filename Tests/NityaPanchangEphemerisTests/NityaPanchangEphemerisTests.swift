@@ -432,4 +432,47 @@ final class NityaPanchangEphemerisTests: XCTestCase {
                        [expected.year, expected.month, expected.day],
                        "\(name) is on the wrong day", file: file, line: line)
     }
+
+    /// Vakri comes from real computed motion, not a default.
+    ///
+    /// The three facts that must hold everywhere: the Sun and Moon are never
+    /// retrograde, Rahu and Ketu always are (the mean node only moves
+    /// backward, and Ketu is its opposite point), and the five star planets
+    /// each turn retrograde some of the time. A flag that was silently never
+    /// populated would fail the second and third of those.
+    func testRetrogradeIsComputedAndBehavesAsTheBodiesDo() async throws {
+        let repo = EphemerisPanchaangRepository()
+        let cal = Calendar(identifier: .gregorian)
+        var comps = DateComponents()
+        comps.timeZone = TimeZone(identifier: "Asia/Kolkata")
+        comps.year = 2025; comps.month = 1; comps.day = 1
+
+        var everRetrograde = Set<Int>()
+        // Every twelfth day across a year: dense enough to catch each star
+        // planet's retrograde spell, the shortest of which runs about three
+        // weeks.
+        for step in 0..<31 {
+            comps.day = 1
+            let start = try XCTUnwrap(cal.date(from: comps))
+            let date = try XCTUnwrap(cal.date(byAdding: .day, value: step * 12, to: start))
+            let chart = await repo.fetchBirthChart(for: date, latitude: latitude, longitude: longitude)
+
+            for planet in chart.planetPositions {
+                if planet.isRetrograde { everRetrograde.insert(planet.id) }
+                if planet.id == 0 || planet.id == 1 {
+                    XCTAssertFalse(planet.isRetrograde,
+                                   "\(planet.name) is never retrograde")
+                }
+                if planet.id == 7 || planet.id == 8 {
+                    XCTAssertTrue(planet.isRetrograde,
+                                  "\(planet.name) is always retrograde")
+                }
+            }
+        }
+
+        for id in 2...6 {
+            XCTAssertTrue(everRetrograde.contains(id),
+                          "planet \(id) should turn retrograde at some point in a year")
+        }
+    }
 }

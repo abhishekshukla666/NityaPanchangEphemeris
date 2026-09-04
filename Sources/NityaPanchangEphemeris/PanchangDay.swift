@@ -76,14 +76,22 @@ public struct PlanetPosition: Identifiable, Sendable {
     public let longitude: Double // 0–360 sidereal
     public let rashiNumber: Int  // 1–12
     public let degrees: Double   // 0–30 within the sign
+    /// Vakri — apparent backward motion against the zodiac.
+    ///
+    /// Defaulted in the initialiser so existing callers keep compiling; the
+    /// ephemeris fills it from the body's computed daily motion. The Sun and
+    /// Moon are never retrograde; Rahu and Ketu always are.
+    public let isRetrograde: Bool
 
-    public init(id: Int, name: String, symbol: String, longitude: Double, rashiNumber: Int, degrees: Double) {
+    public init(id: Int, name: String, symbol: String, longitude: Double, rashiNumber: Int,
+                degrees: Double, isRetrograde: Bool = false) {
         self.id = id
         self.name = name
         self.symbol = symbol
         self.longitude = longitude
         self.rashiNumber = rashiNumber
         self.degrees = degrees
+        self.isRetrograde = isRetrograde
     }
 }
 
