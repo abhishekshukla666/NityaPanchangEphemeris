@@ -475,4 +475,40 @@ final class NityaPanchangEphemerisTests: XCTestCase {
                           "planet \(id) should turn retrograde at some point in a year")
         }
     }
+
+    /// `hasIcon` says whether `emoji` holds an asset name or an actual emoji,
+    /// and the two must agree.
+    ///
+    /// Twelve rules had `hasIcon: true` while carrying a real emoji — 🌿 for
+    /// Hariyali Teej, 🪔 for Narak Chaturdashi, ☀️ for Chhath Puja and the
+    /// rest. Every caller draws those with `Image(named:)`, which finds no
+    /// asset called "🌿" and renders an empty box, so those festivals showed
+    /// no glyph at all on the dashboard strip and the calendar cells.
+    ///
+    /// The package cannot see the app's asset catalogue, but it can hold the
+    /// one rule that makes the flag meaningful: an asset name is ASCII and an
+    /// emoji is not.
+    func testIconFlagAgreesWithWhatTheEmojiFieldHolds() {
+        for rule in allFestivalRules {
+            let isASCII = rule.emoji.allSatisfy { $0.isASCII }
+            XCTAssertEqual(rule.hasIcon, isASCII,
+                           "\(rule.name) has hasIcon: \(rule.hasIcon) but emoji \"\(rule.emoji)\"")
+        }
+    }
+
+    /// Every asset-backed festival names an image the app actually ships.
+    ///
+    /// The catalogue lives in the app and the watch and widget targets, not
+    /// here, so the package cannot check the file exists — but it can pin the
+    /// names it asks for. A rule renamed to an asset nobody ships would
+    /// otherwise fail silently at the drawing end, as an empty box.
+    func testAssetBackedFestivalsNameTheExpectedImages() {
+        let expected: Set<String> = [
+            "axe", "bhaidooj", "buddha", "chariot", "conch-shell", "dhanteras",
+            "diwali", "gada", "ganesh", "gold-pot", "gurunanak", "krishna",
+            "lion", "lordshiv", "navratri", "rakhi", "sacred", "spring",
+        ]
+        let named = Set(allFestivalRules.filter(\.hasIcon).map(\.emoji))
+        XCTAssertEqual(named, expected)
+    }
 }
