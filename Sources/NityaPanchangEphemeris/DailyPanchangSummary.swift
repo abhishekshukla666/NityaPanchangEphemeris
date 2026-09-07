@@ -31,8 +31,17 @@ public struct DailyPanchangSummary: Sendable {
     /// of it.
     public let isPradoshVrat: Bool
 
+    /// Whether Sankashti Chaturthi is kept on this day.
+    ///
+    /// Like Pradosh above, and for the same kind of reason, this cannot be read
+    /// off `tithiNumber`: the vrat is dated by the tithi at moonrise, since the
+    /// fast is broken on sighting the moon, and that is regularly a different
+    /// day from the one Chaturthi reaches at sunrise.
+    public let isSankashtiChaturthi: Bool
+
     public init(date: Date, tithiNumber: Int, nakshatraName: String, moonRashiNumber: Int,
-                vara: String, lunarMonth: Int, isAdhikMaas: Bool, isPradoshVrat: Bool = false) {
+                vara: String, lunarMonth: Int, isAdhikMaas: Bool, isPradoshVrat: Bool = false,
+                isSankashtiChaturthi: Bool = false) {
         self.date = date
         self.tithiNumber = tithiNumber
         self.nakshatraName = nakshatraName
@@ -41,5 +50,6 @@ public struct DailyPanchangSummary: Sendable {
         self.lunarMonth = lunarMonth
         self.isAdhikMaas = isAdhikMaas
         self.isPradoshVrat = isPradoshVrat
+        self.isSankashtiChaturthi = isSankashtiChaturthi
     }
 }

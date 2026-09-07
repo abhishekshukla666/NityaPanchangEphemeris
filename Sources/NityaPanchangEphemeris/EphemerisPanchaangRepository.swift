@@ -132,15 +132,22 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 isPradoshVratDay = isPradoshDay(own: ownPradoshOverlap, previous: previousOverlap, next: nextOverlap)
             }
 
+            // Only the days a Krishna Chaturthi could touch pay for a moonrise.
+            let sunriseTithiNumber = Int(wrapper.calculateTithiNumber(forJulianDay: jdSunrise))
+            let isSankashti = (3...5).contains(sunriseTithiNumber)
+                && isSankashtiDay(date: current, sunriseTithi: sunriseTithiNumber,
+                                  latitude: latitude, longitude: longitude)
+
             results.append(DailyPanchangSummary(
                 date:            current,
-                tithiNumber:     Int(wrapper.calculateTithiNumber(forJulianDay: jdSunrise)),
+                tithiNumber:     sunriseTithiNumber,
                 nakshatraName:   PanchaangHelper.getNakshatraName(Int(wrapper.calculateNakshatra(forJulianDay: jdSunrise))),
                 moonRashiNumber: Int(wrapper.calculateMoonRashi(forJulianDay: jdSunrise)),
                 vara:            PanchaangHelper.getVaraName(for: current),
                 lunarMonth:      Int(wrapper.calculatePurnimantaMonth(forJulianDay: jdSunrise)),
                 isAdhikMaas:     wrapper.calculateIsAdhikMaas(forJulianDay: jdSunrise),
-                isPradoshVrat:   isPradoshVratDay
+                isPradoshVrat:   isPradoshVratDay,
+                isSankashtiChaturthi: isSankashti
             ))
 
             current = cal.date(byAdding: .day, value: 1, to: current) ?? end.addingTimeInterval(1)
@@ -527,10 +534,17 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 ? (1...gap).map { ((tithi - 1 + $0) % 30) + 1 }
                 : []
 
+            let dayDate = cal.date(byAdding: .day, value: day - 1, to: first)
+            let isSankashti = (3...5).contains(tithi) && dayDate.map {
+                isSankashtiDay(date: $0, sunriseTithi: tithi,
+                               latitude: latitude, longitude: longitude)
+            } ?? false
+
             results[day] = MonthDayTithis(
                 sunriseTithi: tithi,
                 lostTithi: skipped.first { $0 == 15 || $0 == 30 } ?? skipped.first ?? 0,
-                isPradoshVrat: isPradoshDay(own: overlap[day + 1], previous: overlap[day], next: overlap[day + 2])
+                isPradoshVrat: isPradoshDay(own: overlap[day + 1], previous: overlap[day], next: overlap[day + 2]),
+                isSankashtiChaturthi: isSankashti
             )
         }
         return results
@@ -1027,6 +1041,41 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     /// tomorrow — the asymmetry is what sends a tie to the later day.
     private func isPradoshDay(own: Int, previous: Int, next: Int) -> Bool {
         own > 0 && own >= previous && own > next
+    }
+
+    /// Whether Chaturthi is the tithi running at this day's moonrise.
+    ///
+    /// Moonrise is the expensive half of a rise/set search — about 60% of it,
+    /// which is why every other caller here uses the sun-only variant — so this
+    /// is asked only of the two or three days a month that can possibly qualify.
+    private func chaturthiAtMoonrise(on date: Date, latitude: Double, longitude: Double) -> Bool {
+        let times = wrapper.calculateSunriseSunset(for: date, latitude: latitude, longitude: longitude)
+        guard let moonriseJD = times["moonriseJD"] as? Double, moonriseJD > 2_400_000 else { return false }
+        return Int(wrapper.calculateTithiNumber(forJulianDay: moonriseJD)) == 4
+    }
+
+    /// Whether Sankashti Chaturthi is kept on this day.
+    ///
+    /// Dated by the tithi at moonrise, not at sunrise: the fast is broken on
+    /// sighting the moon, so the day that matters is the one whose moonrise
+    /// falls inside Chaturthi. The two readings are not interchangeable —
+    /// measured across 2026 at Ujjain they disagree in most months, and a
+    /// sunrise reading loses January entirely, where Chaturthi began after
+    /// sunrise on the 6th and ended before sunrise on the 7th and so reached no
+    /// sunrise at all.
+    ///
+    /// A long Chaturthi can catch two consecutive moonrises. The tie goes to
+    /// the day that also holds it at sunrise, so the fast is kept over a day
+    /// that is Chaturthi throughout rather than one it only reaches by evening.
+    /// That tie-break is reasoned rather than sourced — unlike Ekadashi's
+    /// Dashami-viddha rule, which the tradition states outright — so it is
+    /// worth checking against a published panchang.
+    private func isSankashtiDay(date: Date, sunriseTithi: Int,
+                                latitude: Double, longitude: Double) -> Bool {
+        guard chaturthiAtMoonrise(on: date, latitude: latitude, longitude: longitude) else { return false }
+        guard sunriseTithi != 4 else { return true }
+        guard let next = Calendar.current.date(byAdding: .day, value: 1, to: date) else { return true }
+        return !chaturthiAtMoonrise(on: next, latitude: latitude, longitude: longitude)
     }
 
     /// Minutes of `tithi` falling inside the Pradosh Kaal window of the day

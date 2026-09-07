@@ -255,10 +255,15 @@ public struct MonthDayTithis: Sendable {
     /// touches two consecutive windows and belongs to whichever holds more
     /// of it.
     public let isPradoshVrat: Bool
+    /// Dated by the tithi at moonrise rather than at sunrise — see
+    /// EphemerisPanchaangRepository.isSankashtiDay.
+    public let isSankashtiChaturthi: Bool
 
-    public init(sunriseTithi: Int, lostTithi: Int = 0, isPradoshVrat: Bool) {
+    public init(sunriseTithi: Int, lostTithi: Int = 0, isPradoshVrat: Bool,
+                isSankashtiChaturthi: Bool = false) {
         self.sunriseTithi = sunriseTithi
         self.lostTithi = lostTithi
         self.isPradoshVrat = isPradoshVrat
+        self.isSankashtiChaturthi = isSankashtiChaturthi
     }
 }
