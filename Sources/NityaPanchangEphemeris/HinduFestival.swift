@@ -97,7 +97,13 @@ public let allFestivalRules: [FestivalRule] = [
     FestivalRule(name: "Ugadi",                emoji: "🪷", lunarMonth: 1,  tithiNumber: 16),
     FestivalRule(name: "Gudi Padwa",           emoji: "🌾", lunarMonth: 1,  tithiNumber: 16),
     FestivalRule(name: "Navratri (Chaitra)",   emoji: "🎊", lunarMonth: 1,  tithiNumber: 16),
-    FestivalRule(name: "Ram Navami",           emoji: "🏹", lunarMonth: 1,  tithiNumber: 24),
+    FestivalRule(
+        name: "Ram Navami",
+        emoji: "ram",
+        lunarMonth: 1,
+        tithiNumber: 24,
+        hasIcon: true
+    ),
     FestivalRule(
         name: "Hanuman Jayanti",
         emoji: "hanuman",
@@ -226,7 +232,7 @@ public let allFestivalRules: [FestivalRule] = [
     ),
     FestivalRule(name: "Maha Navami",          emoji: "🪔", lunarMonth: 7,  tithiNumber: 24,
                  observationTime: .aparahna),
-    FestivalRule(name: "Dussehra",             emoji: "dussehra", lunarMonth: 7,  tithiNumber: 25, hasIcon: true,
+    FestivalRule(name: "Dussehra",             emoji: "🏹", lunarMonth: 7,  tithiNumber: 25,
                  observationTime: .aparahna),
     FestivalRule(name: "Sharad Purnima",       emoji: "🌝", lunarMonth: 7,  tithiNumber: 30),
 
