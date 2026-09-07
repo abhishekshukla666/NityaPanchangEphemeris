@@ -504,10 +504,11 @@ final class NityaPanchangEphemerisTests: XCTestCase {
     /// otherwise fail silently at the drawing end, as an empty box.
     func testAssetBackedFestivalsNameTheExpectedImages() {
         let expected: Set<String> = [
-            "axe", "bhaidooj", "buddha", "chariot", "conch-shell", "dhanteras",
-            "diwali", "gada", "ganesh", "gold-pot", "gurunanak", "krishna",
-            "lion", "lordshiv", "navratri", "rakhi", "sacred", "spring",
-        ]
+        "axe", "bhaidooj", "buddha", "chariot", "conch-shell", "dhanteras",
+        "diwali", "ganesh", "gold-pot", "goverdhan", "guru", "gurunanak",
+        "hanuman", "karwa-chauth", "krishna", "lion", "lordshiv", "navratri",
+        "rakhi", "ram", "spring"
+    ]
         let named = Set(allFestivalRules.filter(\.hasIcon).map(\.emoji))
         XCTAssertEqual(named, expected)
     }
