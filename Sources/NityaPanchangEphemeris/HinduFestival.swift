@@ -260,7 +260,7 @@ public let allFestivalRules: [FestivalRule] = [
         hasIcon: true,
         observationTime: .pradoshKaal
     ),
-    FestivalRule(name: "Narak Chaturdashi",    emoji: "🪔", lunarMonth: 8,  tithiNumber: 14),
+    
     FestivalRule(
         name: "Diwali",
         emoji: "diwali",
@@ -269,6 +269,7 @@ public let allFestivalRules: [FestivalRule] = [
         hasIcon: true,
         observationTime: .pradoshKaal
     ),
+    FestivalRule(name: "Narak Chaturdashi",    emoji: "🪔", lunarMonth: 8,  tithiNumber: 14),
     FestivalRule(
         name: "Govardhan Puja",
         emoji: "goverdhan",
