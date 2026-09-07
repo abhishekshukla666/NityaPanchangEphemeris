@@ -100,7 +100,7 @@ public let allFestivalRules: [FestivalRule] = [
     FestivalRule(name: "Ram Navami",           emoji: "🏹", lunarMonth: 1,  tithiNumber: 24),
     FestivalRule(
         name: "Hanuman Jayanti",
-        emoji: "gada",
+        emoji: "hanuman",
         lunarMonth: 1,
         tithiNumber: 30,
         hasIcon: true
@@ -153,7 +153,7 @@ public let allFestivalRules: [FestivalRule] = [
     ),
     FestivalRule(
         name: "Guru Purnima",
-        emoji: "sacred",
+        emoji: "guru",
         lunarMonth: 4,
         tithiNumber: 30,
         hasIcon: true
@@ -226,7 +226,7 @@ public let allFestivalRules: [FestivalRule] = [
     ),
     FestivalRule(name: "Maha Navami",          emoji: "🪔", lunarMonth: 7,  tithiNumber: 24,
                  observationTime: .aparahna),
-    FestivalRule(name: "Dussehra",             emoji: "🏹", lunarMonth: 7,  tithiNumber: 25,
+    FestivalRule(name: "Dussehra",             emoji: "dussehra", lunarMonth: 7,  tithiNumber: 25, hasIcon: true,
                  observationTime: .aparahna),
     FestivalRule(name: "Sharad Purnima",       emoji: "🌝", lunarMonth: 7,  tithiNumber: 30),
 
@@ -235,7 +235,7 @@ public let allFestivalRules: [FestivalRule] = [
     // so the day is the one whose dusk holds Chaturthi. In 2027 Chaturthi runs
     // 18 Oct 17:53 to 19 Oct 16:43 — it fills the 18th's window and is long
     // gone before the 19th's, while the sunrise reading pointed at the 19th.
-    FestivalRule(name: "Karwa Chauth",         emoji: "🌝", lunarMonth: 8,  tithiNumber: 4,
+    FestivalRule(name: "Karwa Chauth",         emoji: "karwa-chauth", lunarMonth: 8,  tithiNumber: 4, hasIcon: true,
                  observationTime: .pradoshKaal),
     FestivalRule(
         name: "Ahoi Ashtami",
@@ -263,7 +263,13 @@ public let allFestivalRules: [FestivalRule] = [
         hasIcon: true,
         observationTime: .pradoshKaal
     ),
-    FestivalRule(name: "Govardhan Puja",       emoji: "🐄", lunarMonth: 8,  tithiNumber: 16),
+    FestivalRule(
+        name: "Govardhan Puja",
+        emoji: "goverdhan",
+        lunarMonth: 8,
+        tithiNumber: 16,
+        hasIcon: true
+    ),
     FestivalRule(
         name: "Bhai Dooj",
         emoji: "bhaidooj",
