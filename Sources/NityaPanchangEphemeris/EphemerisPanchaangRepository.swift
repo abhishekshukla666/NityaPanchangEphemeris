@@ -736,7 +736,23 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             var computed: [(String, Date, String)] = []
 
             if let jd = solarIngressJD(year: year, month: 1, day: 10, targetLongitude: 270) {
-                computed.append(("Makar Sankranti", sankrantiDeferringPastSunset(ingressJD: jd), "🌾"))
+                let makarSankranti = sankrantiDeferringPastSunset(ingressJD: jd)
+                computed.append(("Makar Sankranti", makarSankranti, "🌾"))
+
+                // Lohri is the last night of Poh — the eve of Maghi — so it follows the
+                // Sankranti rather than sitting on a fixed 13 January, which is the same
+                // reasoning that already keeps Makar Sankranti itself off a fixed 14th.
+                // The static date is right in most years and wrong in the two-in-five
+                // where the Sankranti falls on the 15th: 2023, 2024, 2027, 2028, 2031,
+                // 2032 and 2035 all belong on 14 January, and 2023 and 2024 were both
+                // published as such.
+                //
+                // Taken from the observed Sankranti rather than the raw ingress day,
+                // which is what settles 2023: the ingress was on the 14th at 20:45 IST,
+                // after sunset, so Maghi deferred to the 15th and Lohri moved with it.
+                if let lohri = cal.date(byAdding: .day, value: -1, to: makarSankranti) {
+                    computed.append(("Lohri", lohri, "🔥"))
+                }
             }
             if let jd = solarIngressJD(year: year, month: 9, day: 12, targetLongitude: 150) {
                 computed.append(("Vishwakarma Puja", sankrantiDeferringPastSunset(ingressJD: jd), "🛠️"))

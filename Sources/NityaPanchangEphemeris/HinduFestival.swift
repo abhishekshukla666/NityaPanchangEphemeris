@@ -393,9 +393,9 @@ public struct StaticFestivalRule: Sendable {
 // National holidays and universally observed fixed-date festivals for India.
 public let allStaticFestivalRules: [StaticFestivalRule] = [
     StaticFestivalRule(name: "New Year's Day",   emoji: "🎆", month: 1,  day: 1),
-    StaticFestivalRule(name: "Lohri",            emoji: "🔥", month: 1,  day: 13),
-    // Makar Sankranti is NOT here: it is solar, not a fixed Gregorian date.
-    // See EphemerisPanchaangRepository.makarSankranti(year:).
+    // Neither Lohri nor Makar Sankranti is here: both are solar, not fixed
+    // Gregorian dates. See the computed festivals in
+    // EphemerisPanchaangRepository.festivals(from:to:).
 
     StaticFestivalRule(name: "Republic Day",     emoji: "🇮🇳", month: 1,  day: 26),
     // Observed on the Gregorian date by the Maharashtra government, which is
