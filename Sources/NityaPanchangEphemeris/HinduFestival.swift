@@ -239,7 +239,14 @@ public let allFestivalRules: [FestivalRule] = [
                  observationTime: .aparahna),
     FestivalRule(name: "Dussehra",             emoji: "🏹", lunarMonth: 7,  tithiNumber: 25,
                  observationTime: .aparahna),
-    FestivalRule(name: "Sharad Purnima",       emoji: "🌝", lunarMonth: 7,  tithiNumber: 30),
+    // Nishita, not sunrise: the whole observance is the Kojagara moon-viewing at
+    // night, so the day is the one whose night holds Purnima. A Purnima that
+    // begins in the afternoon and ends the next morning covers one night while
+    // reaching two sunrises, which is why the two readings disagree in most
+    // years. 2024 belongs on 16 Oct against the sunrise reading's 17th, and
+    // 2025 on 6 Oct against its 7th — both published as the earlier date.
+    FestivalRule(name: "Sharad Purnima",       emoji: "🌝", lunarMonth: 7,  tithiNumber: 30,
+                 observationTime: .midnight),
 
     // ── Kartika (8) ── [KP = Diwali week] + [SP → Kartik Purnima] ────────────
     // Pradosh, not sunrise: the whole observance is the evening moon sighting,

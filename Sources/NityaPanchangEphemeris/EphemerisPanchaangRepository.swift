@@ -580,6 +580,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             var cachedMidnightTithi: Int?
             var cachedMidnightMonth: Int?
             var cachedMidnightAdhik: Bool?
+            /// Last night's reading, for the no-night fallback below.
+            var cachedPreviousMidnightTithi: Int?
             var cachedAparahnaTithi: Int?
             var cachedAparahnaMonth: Int?
             var cachedAparahnaAdhik: Bool?
@@ -614,9 +616,41 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                         cachedMidnightAdhik = wrapper.calculateIsAdhikMaas(forJulianDay: jdMidnight)
                     }
 
-                    activeTithi = cachedMidnightTithi!
-                    activeMonth = cachedMidnightMonth!
-                    isAdhik = cachedMidnightAdhik!
+                    // A tithi is sampled once a night and averages under
+                    // twenty-four hours, so a short one can begin after one
+                    // midnight and end before the next, reaching no night at
+                    // all. Ashwina Purnima does exactly that in 2041 — running
+                    // from before sunrise on 9 October to before that evening —
+                    // which dropped Sharad Purnima from the year entirely. The
+                    // ordinary kshaya fallback cannot rescue it, being scoped to
+                    // sunrise rules by construction.
+                    //
+                    // The day holding the tithi at sunrise takes it instead,
+                    // which is what the tradition prescribes when no night
+                    // qualifies: the first of the two candidate days. This can
+                    // only ever add a day. It is reached once the previous night
+                    // has been ruled out, and a tithi running at a sunrise but
+                    // not at that night's midnight has ended during the day, so
+                    // it cannot reach the next midnight either.
+                    if cachedMidnightTithi! != rule.tithiNumber,
+                       tithiSunrise == rule.tithiNumber {
+                        if cachedPreviousMidnightTithi == nil {
+                            // 23:59 of yesterday is one minute before this day begins.
+                            let jd = wrapper.getJulianDayUTC(from: startOfDay.addingTimeInterval(-60))
+                            cachedPreviousMidnightTithi = Int(wrapper.calculateTithiNumber(forJulianDay: jd))
+                        }
+                        if cachedPreviousMidnightTithi! == rule.tithiNumber {
+                            // Last night held it; that night owns the observance.
+                            continue
+                        }
+                        activeTithi = tithiSunrise
+                        activeMonth = monthSunrise
+                        isAdhik = isAdhikSunrise
+                    } else {
+                        activeTithi = cachedMidnightTithi!
+                        activeMonth = cachedMidnightMonth!
+                        isAdhik = cachedMidnightAdhik!
+                    }
 
                 case .pradoshKaal:
                     guard nearSunrise() else { continue }
