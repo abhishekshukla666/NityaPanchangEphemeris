@@ -220,7 +220,10 @@ public let allFestivalRules: [FestivalRule] = [
 
     // ── Ashwina (7) ── [KP = Pitru Paksha] + [SP = Navratri → Sharad Purnima] ─
     FestivalRule(name: "Jivitputrika Vrat",    emoji: "🙏", lunarMonth: 7,  tithiNumber: 8),
-    FestivalRule(name: "Mahalaya Amavasya",    emoji: "🌚", lunarMonth: 7,  tithiNumber: 15),
+    // Mahalaya Amavasya, Sarva Pitru Amavasya and Pitra Amavasya name the same
+    // day — the Amavasya that closes Pitru Paksha and carries the last tarpan.
+    // Pitra Amavasya is what it is asked for by.
+    FestivalRule(name: "Pitra Amavasya",       emoji: "🌚", lunarMonth: 7,  tithiNumber: 15),
     FestivalRule(
         name: "Navratri",
         emoji: "navratri",
