@@ -31,6 +31,41 @@ final class SankashtiTests: XCTestCase {
         XCTAssertEqual(found, [6])
     }
 
+    /// The other failure direction, and the one the first version of this rule
+    /// missed. A Chaturthi can reach no moonrise at all: moonrise runs about an
+    /// hour later each night while a tithi averages under twenty-four hours, so
+    /// one beginning just after an evening's moonrise can end before the next.
+    /// Six months over 2026-2031 came back empty for that reason.
+    ///
+    /// 24 Feb 2027 at Ujjain is the case — Chaturthi had not begun at the 23rd's
+    /// moonrise and was over by the 24th's, though the 24th held it at sunrise.
+    func testAChaturthiThatReachesNoMoonriseIsStillFound() async {
+        let found = await sankashtiDays(year: 2027, month: 2)
+        XCTAssertEqual(found, [24])
+    }
+
+    /// All six that were empty, so a regression cannot quietly drop one again.
+    func testNoMonthIsEverEmpty() async {
+        for (year, month) in [(2027, 2), (2028, 1), (2028, 5),
+                              (2030, 4), (2031, 5), (2031, 8)] {
+            let found = await sankashtiDays(year: year, month: month)
+            XCTAssertFalse(found.isEmpty, "\(year)-\(month) has no Sankashti")
+        }
+    }
+
+    /// A lunar year carries twelve or thirteen. Fewer means a month was lost;
+    /// more means the fallback took a day the moonrise rule had already given
+    /// to another, which it must never do.
+    func testEachYearCarriesTwelveOrThirteen() async {
+        for year in 2026...2031 {
+            var count = 0
+            for month in 1...12 {
+                count += await sankashtiDays(year: year, month: month).count
+            }
+            XCTAssertTrue((12...13).contains(count), "\(year) has \(count)")
+        }
+    }
+
     /// Exactly one per lunar month, never none and never a pair.
     func testEveryMonthOfTwentyTwentySixHasOne() async {
         for month in 1...12 {

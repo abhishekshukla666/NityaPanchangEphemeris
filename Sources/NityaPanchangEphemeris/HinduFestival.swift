@@ -196,12 +196,17 @@ public let allFestivalRules: [FestivalRule] = [
         hasIcon: true
     ),
     FestivalRule(name: "Hartalika Teej",       emoji: "🌺", lunarMonth: 6,  tithiNumber: 18),
+    // Ganesha was born in the Hindu midday, so the festival is kept on the day
+    // whose Madhyahna holds Chaturthi — the same madhyahna-vyapini rule Akshaya
+    // Tritiya above is dated by. It sat on the default sunrise reading, which is
+    // a different day whenever the tithi turns over between sunrise and midday.
     FestivalRule(
         name: "Ganesh Chaturthi",
         emoji: "ganesh",
         lunarMonth: 6,
         tithiNumber: 19,
-        hasIcon: true
+        hasIcon: true,
+        observationTime: .madhyahna
     ),
     FestivalRule(name: "Rishi Panchami",       emoji: "🌸", lunarMonth: 6,  tithiNumber: 20),
     FestivalRule(name: "Radha Ashtami",        emoji: "🪈", lunarMonth: 6,  tithiNumber: 23),

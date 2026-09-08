@@ -1064,7 +1064,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     /// sunrise on the 6th and ended before sunrise on the 7th and so reached no
     /// sunrise at all.
     ///
-    /// A long Chaturthi can catch two consecutive moonrises. The tie goes to
+    /// Two failure directions, not one. A long Chaturthi can catch two
+    /// consecutive moonrises; a short one can catch none. The tie goes to
     /// the day that also holds it at sunrise, so the fast is kept over a day
     /// that is Chaturthi throughout rather than one it only reaches by evening.
     /// That tie-break is reasoned rather than sourced — unlike Ekadashi's
@@ -1072,9 +1073,29 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     /// worth checking against a published panchang.
     private func isSankashtiDay(date: Date, sunriseTithi: Int,
                                 latitude: Double, longitude: Double) -> Bool {
-        guard chaturthiAtMoonrise(on: date, latitude: latitude, longitude: longitude) else { return false }
+        let cal = Calendar.current
+        guard chaturthiAtMoonrise(on: date, latitude: latitude, longitude: longitude) else {
+            // A Chaturthi can reach no moonrise at all. Moonrise runs about an
+            // hour later each night while a tithi averages under twenty-four
+            // hours, so one that begins just after an evening's moonrise can end
+            // before the next — and then a moonrise test selects no day and the
+            // vrat vanishes from that month, exactly the way a sunrise test
+            // loses a kshaya tithi. Six months over 2026–2031 were empty for
+            // this reason, 24 Feb 2027 among them: Chaturthi had not begun at
+            // the 23rd's moonrise at 20:59 and was already over by the 24th's
+            // at 21:58, though the 24th held it at sunrise.
+            //
+            // So the day that holds Chaturthi at sunrise keeps the vrat, which
+            // is the day a devotee actually fasts, breaking it at that evening's
+            // moonrise even though the tithi has just ended. Reached only after
+            // both neighbouring moonrises have been ruled out, so it can never
+            // take a day the moonrise rule has already given to another.
+            guard sunriseTithi == 4 else { return false }
+            guard let previous = cal.date(byAdding: .day, value: -1, to: date) else { return true }
+            return !chaturthiAtMoonrise(on: previous, latitude: latitude, longitude: longitude)
+        }
         guard sunriseTithi != 4 else { return true }
-        guard let next = Calendar.current.date(byAdding: .day, value: 1, to: date) else { return true }
+        guard let next = cal.date(byAdding: .day, value: 1, to: date) else { return true }
         return !chaturthiAtMoonrise(on: next, latitude: latitude, longitude: longitude)
     }
 
