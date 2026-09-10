@@ -1,4 +1,5 @@
 import XCTest
+import SwissEphWrapper
 @testable import NityaPanchangEphemeris
 
 /// The day's limbs as periods, beside the Udaya reading that names the day.
@@ -99,6 +100,68 @@ final class LimbPeriodTests: XCTestCase {
             XCTAssertEqual(p.karanas.filter { $0.contains(instant) }.count, 1,
                            "hour \(hour): \(p.karanas.filter { $0.contains(instant) }.map(\.name))")
         }
+    }
+
+    // MARK: - Rashi
+
+    /// The Moon's sign is the odd one out: a rashi is 30 degrees against a
+    /// nakshatra's 13 degrees 20, and the Moon covers about 13.2 a day, so it
+    /// stays in one sign for roughly two and a quarter days. Most days therefore
+    /// carry a single period whose end falls tomorrow or later — which is why
+    /// the chip calls it a transit rather than an end.
+    func testARashiUsuallyLastsBeyondTheDay() async {
+        let p = await day(2026, 9, 10)
+        XCTAssertEqual(p.rashis.count, 1)
+        let end = try? XCTUnwrap(p.rashis.first?.endTime)
+        XCTAssertNotNil(end)
+        XCTAssertGreaterThan(end!, p.sunrise.addingTimeInterval(24 * 3600),
+                             "the Moon left its sign within the day, which should be rare")
+    }
+
+    /// The search window is three days, not the day and a half the nakshatra and
+    /// yoga scans use, because the Moon needs about two and a quarter days to
+    /// cross a sign. Shorten it and the scan runs to its own limit and reports
+    /// that as the answer — a plausible-looking time at which nothing happens.
+    ///
+    /// So this asserts a *real* crossing rather than a bounded one: the sign a
+    /// minute before the reported end is the one that started, and a minute
+    /// after it is not. A window that stops early fails here; merely checking
+    /// the end is under three days does not, which is what a first version of
+    /// this test got wrong.
+    func testTheRashiEndIsARealCrossingNotTheEndOfTheSearch() async throws {
+        let wrapper = SwissEphWrapper()
+        let minute = 1.0 / 1440.0
+        for d in 1...20 {
+            let p = await day(2026, 9, d)
+            let end = try XCTUnwrap(p.rashis.first?.endTime)
+            let endJD = wrapper.getJulianDayUTC(from: end)
+            let startJD = wrapper.getJulianDayUTC(from: p.sunrise)
+            let starting = Int(wrapper.calculateMoonRashi(forJulianDay: startJD))
+            XCTAssertEqual(Int(wrapper.calculateMoonRashi(forJulianDay: endJD - minute)), starting,
+                           "day \(d): the sign had already changed before the reported end")
+            XCTAssertNotEqual(Int(wrapper.calculateMoonRashi(forJulianDay: endJD + minute)), starting,
+                              "day \(d): nothing happens at the reported end — the search ran to its limit")
+        }
+    }
+
+    /// The day the Moon does change sign carries two periods, and the first is
+    /// still the Udaya reading.
+    func testTheTransitDayCarriesBothSigns() async {
+        let p = await day(2026, 9, 11)
+        XCTAssertEqual(p.rashis.count, 2, "got \(p.rashis.map(\.name))")
+        XCTAssertEqual(p.rashis.first?.name, p.moonRashi)
+        XCTAssertNotEqual(p.rashis.first?.name, p.rashis.last?.name)
+    }
+
+    /// Names carry the sign's symbol, the same shape as `moonRashi`, so the one
+    /// localisation path serves both. A bare name would go through `t` and come
+    /// back English on a Hindi screen.
+    func testRashiNamesCarryTheirSymbol() async {
+        let p = await day(2026, 9, 10)
+        let name = p.rashis.first!.name
+        XCTAssertEqual(name, p.moonRashi)
+        XCTAssertTrue(name.contains(" "), "expected symbol and name: \(name)")
+        XCTAssertFalse(name.first!.isLetter, "expected a leading symbol: \(name)")
     }
 
     /// Before sunrise nothing is running, matching the hora and lagna lists:

@@ -455,6 +455,20 @@ static double NPRefineCrossing(double lastHolding, double firstNotHolding,
                             ^int(double jd) { return [self calculateNakshatraForJulianDay:jd]; });
 }
 
+- (double)calculateMoonRashiEndTimeForJulianDay:(double)startJD {
+    int startingRashi = [self calculateMoonRashiForJulianDay:startJD];
+    double step = 15.0 / (24.0 * 60.0);
+    double searchJD = startJD;
+    int searchRashi = startingRashi;
+    while (searchRashi == startingRashi) {
+        searchJD += step;
+        searchRashi = [self calculateMoonRashiForJulianDay:searchJD];
+        if (searchJD > startJD + 3.0) { return searchJD; }
+    }
+    return NPRefineCrossing(searchJD - step, searchJD, startingRashi,
+                            ^int(double jd) { return [self calculateMoonRashiForJulianDay:jd]; });
+}
+
 - (double)calculateYogaEndTimeForJulianDay:(double)startJD {
     int startingYoga = [self calculateYogaForJulianDay:startJD];
     double step = 15.0 / (24.0 * 60.0);

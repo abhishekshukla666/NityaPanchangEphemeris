@@ -285,6 +285,13 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             valueAt: { Int(self.wrapper.calculateYoga(forJulianDay: $0)) },
             endFrom: { self.wrapper.calculateYogaEndTime(forJulianDay: $0) },
             name: PanchaangHelper.getYogaName)
+        // The Moon's sign. Named with its symbol so it matches `moonRashi`, which
+        // is what every caller already knows how to localise.
+        let rashiPeriods = limbPeriods(
+            sunriseJD: sunriseJD, nextSunriseJD: nextSunriseJD,
+            valueAt: { Int(self.wrapper.calculateMoonRashi(forJulianDay: $0)) },
+            endFrom: { self.wrapper.calculateMoonRashiEndTime(forJulianDay: $0) },
+            name: { "\(PanchaangHelper.getRashiSymbol($0)) \(PanchaangHelper.getMoonRashiName($0))" })
         let karanaPeriods = limbPeriods(
             sunriseJD: sunriseJD, nextSunriseJD: nextSunriseJD,
             valueAt: { Int(self.wrapper.calculateKarana(forJulianDay: $0)) },
@@ -339,7 +346,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             isPradoshVrat:     isPradoshVratDay,
             nakshatras:        nakshatraPeriods,
             yogas:             yogaPeriods,
-            karanas:           karanaPeriods
+            karanas:           karanaPeriods,
+            rashis:            rashiPeriods
         )
     }
 

@@ -218,6 +218,17 @@ public struct PanchangDay: Sendable {
     public let nakshatras: [LimbPeriod]
     public let yogas: [LimbPeriod]
     public let karanas: [LimbPeriod]
+    /// The Moon's sign, as periods on the same footing as the three above.
+    ///
+    /// Usually one entry, and its end usually falls a day or two out: a rashi
+    /// is 30 degrees and the Moon covers about 13.2 a day, so it stays in one
+    /// sign for roughly two and a quarter days. So unlike the other limbs this
+    /// often does not change during the day at all, and the useful fact is when
+    /// the Moon next moves on rather than when today's reading stops.
+    ///
+    /// Names carry the sign's symbol, matching `moonRashi` — the same shape, so
+    /// the same localisation path handles both.
+    public let rashis: [LimbPeriod]
 
     /// The Vishti (Bhadra) karana window for the day, if one falls within it —
     /// nil most days (Bhadra occurs on roughly 8 of every 30 tithis). Defaults
@@ -248,7 +259,8 @@ public struct PanchangDay: Sendable {
                 nightChaughariya: [Muhurat], planetPositions: [PlanetPosition],
                 vedaAyana: String, raviYoga: Bool, horas: [HoraInfo], lagnas: [LagnaPeriod],
                 bhadraKaal: Muhurat? = nil, amantaMonth: String = "", isPradoshVrat: Bool = false,
-                nakshatras: [LimbPeriod] = [], yogas: [LimbPeriod] = [], karanas: [LimbPeriod] = []) {
+                nakshatras: [LimbPeriod] = [], yogas: [LimbPeriod] = [],
+                karanas: [LimbPeriod] = [], rashis: [LimbPeriod] = []) {
         self.date = date
         self.lunarMonth = lunarMonth
         self.lunarMonthNumber = lunarMonthNumber
@@ -278,6 +290,7 @@ public struct PanchangDay: Sendable {
         self.nakshatras = nakshatras
         self.yogas = yogas
         self.karanas = karanas
+        self.rashis = rashis
     }
 }
 

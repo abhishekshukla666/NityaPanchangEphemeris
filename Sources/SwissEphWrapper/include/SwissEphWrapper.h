@@ -70,6 +70,15 @@ typedef struct {
 - (double)calculateYogaEndTimeForJulianDay:(double)startJD;
 - (int)calculateMoonRashiForJulianDay:(double)jd;
 
+/// When the Moon leaves the sign it is in at `startJD`.
+///
+/// Searched over three days rather than the day and a half the nakshatra and
+/// yoga scans use: a rashi is 30 degrees against a nakshatra's 13 degrees 20,
+/// and the Moon covers about 13.2 degrees a day, so it sits in one sign for
+/// roughly two and a quarter days. A day-and-a-half window would miss the
+/// crossing outright and report the end of the search instead.
+- (double)calculateMoonRashiEndTimeForJulianDay:(double)startJD;
+
 - (int)calculateKaranaForJulianDay:(double)jd;
 - (double)calculateKaranaEndTimeForJulianDay:(double)startJD;
 
