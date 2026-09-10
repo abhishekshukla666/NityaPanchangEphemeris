@@ -273,6 +273,24 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                                    latitude: latitude, longitude: longitude)
         let bhadraKaal = computeBhadraKaal(sunriseJD: sunriseJD, nextSunriseJD: nextSunriseJD)
 
+        // The day's limbs as periods, so a caller can show what is running now
+        // beside the Udaya reading that names the day.
+        let nakshatraPeriods = limbPeriods(
+            sunriseJD: sunriseJD, nextSunriseJD: nextSunriseJD,
+            valueAt: { Int(self.wrapper.calculateNakshatra(forJulianDay: $0)) },
+            endFrom: { self.wrapper.calculateNakshatraEndTime(forJulianDay: $0) },
+            name: PanchaangHelper.getNakshatraName)
+        let yogaPeriods = limbPeriods(
+            sunriseJD: sunriseJD, nextSunriseJD: nextSunriseJD,
+            valueAt: { Int(self.wrapper.calculateYoga(forJulianDay: $0)) },
+            endFrom: { self.wrapper.calculateYogaEndTime(forJulianDay: $0) },
+            name: PanchaangHelper.getYogaName)
+        let karanaPeriods = limbPeriods(
+            sunriseJD: sunriseJD, nextSunriseJD: nextSunriseJD,
+            valueAt: { Int(self.wrapper.calculateKarana(forJulianDay: $0)) },
+            endFrom: { self.wrapper.calculateKaranaEndTime(forJulianDay: $0) },
+            name: PanchaangHelper.getKaranaName)
+
         // Pradosh Vrat. Reuses nextSunriseJD above to close tonight's
         // window; the two neighbouring days are only fetched when tonight
         // actually holds some Trayodashi, which is a handful of days a
@@ -301,7 +319,11 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             tithiNumber:       tithiNum,
             nakshatra:         Nakshatra(name: PanchaangHelper.getNakshatraName(nakshatraNum), endTime: nakshatraEnd),
             yoga:              MinorLimb(name: PanchaangHelper.getYogaName(yogaNum),    endTime: yogaEnd),
-            karana:            MinorLimb(name: PanchaangHelper.getKaranaName(karanaNum), endTime: nil),
+            // The Udaya karana's end, which had no value to give before the day's
+            // karanas were walked. Same period by construction: both start at
+            // sunrise.
+            karana:            MinorLimb(name: PanchaangHelper.getKaranaName(karanaNum),
+                                         endTime: karanaPeriods.first?.endTime),
             vara:              PanchaangHelper.getVaraName(for: dayStart),
             moonRashi:         moonRashi,
             muhurats:          muhurats,
@@ -314,7 +336,10 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             lagnas:            lagnas,
             bhadraKaal:        bhadraKaal,
             amantaMonth:       amantaMonthName,
-            isPradoshVrat:     isPradoshVratDay
+            isPradoshVrat:     isPradoshVratDay,
+            nakshatras:        nakshatraPeriods,
+            yogas:             yogaPeriods,
+            karanas:           karanaPeriods
         )
     }
 
@@ -322,6 +347,36 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     /// karana window, the classically inauspicious half-tithi period most
     /// commonly known for the Raksha Bandhan "don't tie during Bhadra" rule.
     /// A karana already in progress at sunrise is walked backward to its true
+    /// Every period of one limb touching a panchang day, sunrise to next sunrise.
+    ///
+    /// Walks by taking each period's end as the next one's start, which is only
+    /// sound because the end-time searches now land just past the crossing — a
+    /// boundary instant that still read as the old value would leave this
+    /// stepping on the spot. See NPRefineCrossing.
+    ///
+    /// The first period's start is clipped to sunrise. The limb itself usually
+    /// began the previous evening, but the panchang day starts at sunrise and
+    /// finding the true start would cost a second scan backwards for a time no
+    /// caller shows. Bounded at eight so a limb that somehow fails to advance
+    /// cannot spin, since this runs inside the ephemeris queue.
+    private func limbPeriods(sunriseJD: Double, nextSunriseJD: Double,
+                             valueAt: (Double) -> Int,
+                             endFrom: (Double) -> Double,
+                             name: (Int) -> String) -> [LimbPeriod] {
+        var periods: [LimbPeriod] = []
+        var startJD = sunriseJD
+        while startJD < nextSunriseJD, periods.count < 8 {
+            let endJD = endFrom(startJD)
+            guard endJD > startJD else { break }
+            periods.append(LimbPeriod(id: periods.count,
+                                      name: name(valueAt(startJD)),
+                                      startTime: jdToDate(startJD),
+                                      endTime: jdToDate(endJD)))
+            startJD = endJD
+        }
+        return periods
+    }
+
     /// start rather than clipped — a warning needs an accurate start time to
     /// be useful, not just "some time before now."
     private func computeBhadraKaal(sunriseJD: Double, nextSunriseJD: Double) -> Muhurat? {

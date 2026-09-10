@@ -120,6 +120,41 @@ public struct HoraInfo: Identifiable, Sendable {
 
 // MARK: - Lagna (Rising Sign Period)
 
+/// One stretch of the day during which a limb holds a single value.
+///
+/// `nakshatra`, `yoga` and `karana` on PanchangDay are the *Udaya* readings —
+/// taken at sunrise, which is what names the day and what every festival and
+/// vrat in this library is dated by. They are correct and they must not change.
+/// But they are also a snapshot, and a limb moves on during the day: a karana
+/// lasts about eleven hours, so by mid-morning the sunrise reading is describing
+/// something that has already finished.
+///
+/// These arrays carry the whole day so a caller can show both — the reading that
+/// names the day, and the one running at this moment. Deliberately periods
+/// rather than a "current" field: a PanchangDay is fetched once and held, while
+/// now keeps moving, so anything baked in as current would go stale in the hand.
+/// Hora, Lagna and Chaughariya are already shaped this way.
+public struct LimbPeriod: Identifiable, Sendable {
+    public let id: Int
+    /// The limb's name, unlocalised — the same string the Udaya reading carries,
+    /// so both go through the caller's catalogue the same way.
+    public let name: String
+    public let startTime: Date
+    public let endTime: Date
+
+    public init(id: Int, name: String, startTime: Date, endTime: Date) {
+        self.id = id
+        self.name = name
+        self.startTime = startTime
+        self.endTime = endTime
+    }
+
+    public func contains(_ date: Date) -> Bool { date >= startTime && date < endTime }
+    /// Convenience for views, matching LagnaPeriod. Prefer `contains(_:)` where
+    /// the instant matters — a test, or a screen that pins a date.
+    public var isActive: Bool { contains(Date()) }
+}
+
 public struct LagnaPeriod: Identifiable, Sendable {
     public let id: Int
     public let rashiNumber: Int    // 1–12
@@ -171,6 +206,18 @@ public struct PanchangDay: Sendable {
 
     public let horas: [HoraInfo]            // 24 Vedic planetary hours (12 day + 12 night, Chaldean order)
     public let lagnas: [LagnaPeriod]        // Rising sign (Ascendant) periods sunrise → next sunrise
+    /// Every nakshatra, yoga and karana touching this panchang day, sunrise to
+    /// next sunrise — see LimbPeriod. Two or three entries each; a karana is
+    /// about half a tithi, so three of them usually reach into one day.
+    ///
+    /// Bounded by sunrise the way the hora and lagna lists are, so nothing is
+    /// active between midnight and sunrise. That is the same convention those
+    /// already follow: before sunrise the panchang day has not begun.
+    ///
+    /// Defaulted to empty so existing callers, previews and tests are unaffected.
+    public let nakshatras: [LimbPeriod]
+    public let yogas: [LimbPeriod]
+    public let karanas: [LimbPeriod]
 
     /// The Vishti (Bhadra) karana window for the day, if one falls within it —
     /// nil most days (Bhadra occurs on roughly 8 of every 30 tithis). Defaults
@@ -200,7 +247,8 @@ public struct PanchangDay: Sendable {
                 vara: String, moonRashi: String, muhurats: [Muhurat], chaughariya: [Muhurat],
                 nightChaughariya: [Muhurat], planetPositions: [PlanetPosition],
                 vedaAyana: String, raviYoga: Bool, horas: [HoraInfo], lagnas: [LagnaPeriod],
-                bhadraKaal: Muhurat? = nil, amantaMonth: String = "", isPradoshVrat: Bool = false) {
+                bhadraKaal: Muhurat? = nil, amantaMonth: String = "", isPradoshVrat: Bool = false,
+                nakshatras: [LimbPeriod] = [], yogas: [LimbPeriod] = [], karanas: [LimbPeriod] = []) {
         self.date = date
         self.lunarMonth = lunarMonth
         self.lunarMonthNumber = lunarMonthNumber
@@ -227,6 +275,9 @@ public struct PanchangDay: Sendable {
         self.bhadraKaal = bhadraKaal
         self.amantaMonth = amantaMonth
         self.isPradoshVrat = isPradoshVrat
+        self.nakshatras = nakshatras
+        self.yogas = yogas
+        self.karanas = karanas
     }
 }
 
