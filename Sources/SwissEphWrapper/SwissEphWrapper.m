@@ -578,6 +578,39 @@ static double NPRefineCrossing(double lastHolding, double firstNotHolding,
     return [result copy];
 }
 
+// MARK: - Uranus, Neptune, Pluto
+
+// Their own call, not appended to calculatePlanetPositionsForJulianDay:. That
+// array is the Navagraha, and it is read by code that reasons about the nine —
+// a dasha lord, a sign lordship, a hora. Three more bodies quietly appearing in
+// it would be found by all of that rather than only by the screens meant to
+// show them.
+- (NSArray<NSDictionary *> *)calculateOuterPlanetPositionsForJulianDay:(double)jd {
+    swe_set_sid_mode(SE_SIDM_LAHIRI, 0, 0);
+    long flags = SEFLG_SWIEPH | SEFLG_SIDEREAL | SEFLG_SPEED;
+    char errorMessage[256];
+    NSMutableArray *result = [NSMutableArray arrayWithCapacity:3];
+
+    int seIds[3] = { SE_URANUS, SE_NEPTUNE, SE_PLUTO };
+    for (int i = 0; i < 3; i++) {
+        double pos[6];
+        swe_calc_ut(jd, seIds[i], flags, pos, errorMessage);
+        double lon = pos[0];
+        while (lon <    0.0) { lon += 360.0; }
+        while (lon >= 360.0) { lon -= 360.0; }
+        [result addObject:@{
+            @"planetIndex":  @(9 + i),
+            @"longitude":    @(lon),
+            @"rashiNumber":  @((int)(lon / 30.0) + 1),
+            @"degrees":      @(fmod(lon, 30.0)),
+            // All three are retrograde for roughly five months of every year,
+            // which is most of what there is to say about their motion.
+            @"isRetrograde": @(pos[3] < 0)
+        }];
+    }
+    return [result copy];
+}
+
 // MARK: - Rashi Parivartan (a graha's next sign change)
 
 // The nine grahas' greatest apparent speed in longitude, degrees per day, with a
@@ -591,7 +624,7 @@ static double NPRefineCrossing(double lastHolding, double firstNotHolding,
 //
 // Both directions count. A retrograde graha leaves through the boundary behind
 // it, so the stride is measured to whichever boundary is nearer.
-static const double NPMaxSpeedDegreesPerDay[9] = {
+static const double NPMaxSpeedDegreesPerDay[12] = {
     1.05,   // Sun
     15.40,  // Moon
     0.85,   // Mars
@@ -600,11 +633,28 @@ static const double NPMaxSpeedDegreesPerDay[9] = {
     1.30,   // Venus
     0.14,   // Saturn
     0.06,   // Rahu — the mean node moves uniformly
-    0.06    // Ketu
+    0.06,   // Ketu
+    0.07,   // Uranus
+    0.05,   // Neptune
+    0.05    // Pluto
 };
 
+// How far forward to look for a sign change, in days.
+//
+// The nine never need more than three years: Saturn is the slowest of them, and
+// a retrograde loop across a boundary can hold it in one sign for about that
+// long. The modern three are a different order of slow — Uranus spends seven
+// years in a sign, Neptune fourteen, and Pluto anywhere from twelve to thirty
+// depending on where in its lopsided orbit it is. Thirty-three years covers the
+// worst of that, and costs nothing to search: the stride below is measured in
+// degrees to the boundary over top speed, so Pluto crosses the middle of a sign
+// in strides of nearly a year.
+static double NPRashiSearchWindowDays(int planetIndex) {
+    return planetIndex >= 9 ? 12000.0 : 1200.0;
+}
+
 - (double)calculatePlanetLongitudeForPlanet:(int)planetIndex julianDay:(double)jd {
-    if (planetIndex < 0 || planetIndex > 8) { return -1.0; }
+    if (planetIndex < 0 || planetIndex > 11) { return -1.0; }
     swe_set_sid_mode(SE_SIDM_LAHIRI, 0, 0);
     long flags = SEFLG_SWIEPH | SEFLG_SIDEREAL | SEFLG_SPEED;
     char errorMessage[256];
@@ -613,7 +663,11 @@ static const double NPMaxSpeedDegreesPerDay[9] = {
     // Same order as calculatePlanetPositionsForJulianDay:, which is not the
     // Swiss Ephemeris' own — Mars precedes Mercury here.
     int seIds[7] = { SE_SUN, SE_MOON, SE_MARS, SE_MERCURY, SE_JUPITER, SE_VENUS, SE_SATURN };
-    int seId = planetIndex < 7 ? seIds[planetIndex] : SE_MEAN_NODE;
+    int outerIds[3] = { SE_URANUS, SE_NEPTUNE, SE_PLUTO };
+    int seId;
+    if (planetIndex < 7)       { seId = seIds[planetIndex]; }
+    else if (planetIndex < 9)  { seId = SE_MEAN_NODE; }
+    else                       { seId = outerIds[planetIndex - 9]; }
 
     swe_calc_ut(jd, seId, flags, pos, errorMessage);
     double lon = pos[0];
@@ -625,7 +679,7 @@ static const double NPMaxSpeedDegreesPerDay[9] = {
 }
 
 - (double)calculateRashiChangeJDForPlanet:(int)planetIndex fromJulianDay:(double)startJD {
-    if (planetIndex < 0 || planetIndex > 8) { return 0.0; }
+    if (planetIndex < 0 || planetIndex > 11) { return 0.0; }
 
     int (^rashiAt)(double) = ^int(double jd) {
         return (int)([self calculatePlanetLongitudeForPlanet:planetIndex julianDay:jd] / 30.0) + 1;
@@ -634,7 +688,7 @@ static const double NPMaxSpeedDegreesPerDay[9] = {
     int startingRashi = rashiAt(startJD);
     double maxSpeed = NPMaxSpeedDegreesPerDay[planetIndex];
     double searchJD = startJD;
-    double limitJD  = startJD + 1200.0;
+    double limitJD  = startJD + NPRashiSearchWindowDays(planetIndex);
 
     while (searchJD < limitJD) {
         double lon = [self calculatePlanetLongitudeForPlanet:planetIndex julianDay:searchJD];

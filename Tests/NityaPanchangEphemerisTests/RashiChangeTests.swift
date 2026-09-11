@@ -133,12 +133,13 @@ final class RashiChangeTests: XCTestCase {
         XCTAssertEqual(sun.toRashi, 6, "Kanya")
     }
 
-    /// All nine, and in planet order — the card that reads them shows them in
-    /// that order and does no sorting of its own.
-    func testAllNineComeBackInPlanetOrder() async {
+    /// All twelve, and in planet order — the card that reads them shows them in
+    /// that order and does no sorting of its own. Nine grahas, then Uranus,
+    /// Neptune and Pluto, which the same search reaches on a longer window.
+    func testEveryBodyComesBackInPlanetOrder() async {
         let changes = await repo.fetchRashiChanges(
             from: ist.date(from: DateComponents(year: 2026, month: 9, day: 11))!)
-        XCTAssertEqual(changes.map(\.planetID), Array(0...8))
+        XCTAssertEqual(changes.map(\.planetID), Array(0...11))
     }
 
     /// Saturn is the reason the window is 1200 days rather than a year: a

@@ -224,6 +224,14 @@ public struct PanchangDay: Sendable {
     public let chaughariya: [Muhurat]       // 8 equal daytime Choghadiya periods (sunrise→sunset)
     public let nightChaughariya: [Muhurat]  // 8 equal nighttime Choghadiya periods (sunset→next sunrise)
     public let planetPositions: [PlanetPosition]
+    /// Uranus, Neptune and Pluto, in their own array rather than among the nine.
+    ///
+    /// No classical rule has a place for them — Vimshottari divides its hundred
+    /// and twenty years among nine lords, a hora belongs to one of the seven,
+    /// and these three rule no sign in Parashari. Keeping them apart means code
+    /// that reasons about the Navagraha cannot pick them up by accident, and a
+    /// screen that wants to show them says so.
+    public let outerPlanets: [PlanetPosition]
 
     public let vedaAyana: String            // "Uttarayana" or "Dakshinayana"
     public let raviYoga: Bool               // Moon in weekday's ruling nakshatra
@@ -284,7 +292,8 @@ public struct PanchangDay: Sendable {
                 vedaAyana: String, raviYoga: Bool, horas: [HoraInfo], lagnas: [LagnaPeriod],
                 bhadraKaal: Muhurat? = nil, amantaMonth: String = "", isPradoshVrat: Bool = false,
                 nakshatras: [LimbPeriod] = [], yogas: [LimbPeriod] = [],
-                karanas: [LimbPeriod] = [], rashis: [LimbPeriod] = []) {
+                karanas: [LimbPeriod] = [], rashis: [LimbPeriod] = [],
+                outerPlanets: [PlanetPosition] = []) {
         self.date = date
         self.lunarMonth = lunarMonth
         self.lunarMonthNumber = lunarMonthNumber
@@ -304,6 +313,7 @@ public struct PanchangDay: Sendable {
         self.chaughariya = chaughariya
         self.nightChaughariya = nightChaughariya
         self.planetPositions = planetPositions
+        self.outerPlanets = outerPlanets
         self.vedaAyana = vedaAyana
         self.raviYoga = raviYoga
         self.horas = horas

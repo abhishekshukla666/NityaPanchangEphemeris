@@ -86,10 +86,25 @@ public struct PanchaangHelper {
 
     // MARK: - Navagraha
 
+    /// The nine grahas, then the three modern planets.
+    ///
+    /// Ids 0â8 are the Navagraha and are what every classical calculation in
+    /// this package uses — a dasha, a lordship, a hora. Ids 9â11 are Uranus,
+    /// Neptune and Pluto, which no classical text knows: they are computed and
+    /// named here so a caller can *show* them, and they are kept in their own
+    /// array on PanchangDay and BirthChart so that nothing which reasons about
+    /// the nine can pick them up by accident.
     public static let planetNames: [(name: String, symbol: String)] = [
         ("Sun",   "☉"), ("Moon", "☾"), ("Mars", "♂"), ("Mercury",  "☿"),
         ("Jupiter",    "♃"), ("Venus",  "♀"), ("Saturn",   "♄"), ("Rahu",   "☊"), ("Ketu", "☋"),
+        ("Uranus", "♅"), ("Neptune", "♆"), ("Pluto", "♇"),
     ]
+
+    /// The Navagraha — the ids a classical rule may look at.
+    public static let navagrahaIDs = 0...8
+
+    /// Uranus, Neptune and Pluto.
+    public static let outerPlanetIDs = 9...11
 
     public static func buildPlanetPositions(from raw: [[String: Any]]) -> [PlanetPosition] {
         raw.compactMap { dict in

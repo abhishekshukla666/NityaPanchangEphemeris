@@ -86,6 +86,13 @@ typedef struct {
 /// Each dict has: planetIndex (0–8), longitude (0–360), rashiNumber (1–12), degreesInSign (0–30).
 - (NSArray<NSDictionary *> *)calculatePlanetPositionsForJulianDay:(double)jd;
 
+/// Uranus, Neptune and Pluto — three NSDictionary objects shaped exactly like
+/// `calculatePlanetPositionsForJulianDay:`, with planetIndex 9, 10 and 11.
+///
+/// Separate from the Navagraha call on purpose: that array is read by code that
+/// reasons about the nine, and no classical rule has a place for these three.
+- (NSArray<NSDictionary *> *)calculateOuterPlanetPositionsForJulianDay:(double)jd;
+
 /// The graha's sidereal longitude (0–360) at `jd`, by the same planet indices
 /// `calculatePlanetPositionsForJulianDay:` uses — 0 Sun, 1 Moon, 2 Mars,
 /// 3 Mercury, 4 Jupiter, 5 Venus, 6 Saturn, 7 Rahu, 8 Ketu. Returns -1 for an

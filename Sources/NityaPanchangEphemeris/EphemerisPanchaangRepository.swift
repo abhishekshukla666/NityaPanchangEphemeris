@@ -113,7 +113,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
 
     // MARK: - Private computation (always called from `queue`)
 
-    /// The nine grahas' next sign changes, in planet order.
+    /// The twelve bodies' next sign changes, in planet order — the nine, then
+    /// Uranus, Neptune and Pluto.
     ///
     /// The destination sign is read a minute past the crossing rather than
     /// computed as "one more than the current one": a retrograde graha leaves
@@ -121,7 +122,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     /// and at the sign boundary between Meena and Mesha either direction wraps.
     private func computeRashiChanges(from date: Date) -> [RashiChange] {
         let jd = wrapper.getJulianDayUTC(from: date)
-        return (0...8).compactMap { planet in
+        return (0...11).compactMap { planet in
             let changeJD = wrapper.calculateRashiChangeJD(forPlanet: Int32(planet), fromJulianDay: jd)
             // Zero means the search ran its full window without finding one,
             // which no real graha should do — but reporting nothing is the only
@@ -252,6 +253,10 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         // Navagraha positions at sunrise
         let rawPlanets      = wrapper.calculatePlanetPositions(forJulianDay: refJD)
         let planetPositions = PanchaangHelper.buildPlanetPositions(from: rawPlanets as? [[String: Any]] ?? [])
+        // Uranus, Neptune and Pluto, kept apart from the nine. Three more
+        // ephemeris calls on a path that already makes dozens.
+        let rawOuter      = wrapper.calculateOuterPlanetPositions(forJulianDay: refJD)
+        let outerPlanets  = PanchaangHelper.buildPlanetPositions(from: rawOuter as? [[String: Any]] ?? [])
 
         // Vedic Ayana: Sun in Capricorn–Gemini (≤3 or ≥10) = Uttarayana; else Dakshinayana
         let sunRashiNum = planetPositions.first(where: { $0.id == 0 })?.rashiNumber ?? 1
@@ -377,7 +382,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             nakshatras:        nakshatraPeriods,
             yogas:             yogaPeriods,
             karanas:           karanaPeriods,
-            rashis:            rashiPeriods
+            rashis:            rashiPeriods,
+            outerPlanets:      outerPlanets
         )
     }
 
