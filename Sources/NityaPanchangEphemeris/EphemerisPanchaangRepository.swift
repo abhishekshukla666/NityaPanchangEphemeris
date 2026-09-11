@@ -103,7 +103,37 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         }
     }
 
+    public func fetchRashiChanges(from date: Date) async -> [RashiChange] {
+        await withCheckedContinuation { continuation in
+            queue.async { [self] in
+                continuation.resume(returning: computeRashiChanges(from: date))
+            }
+        }
+    }
+
     // MARK: - Private computation (always called from `queue`)
+
+    /// The nine grahas' next sign changes, in planet order.
+    ///
+    /// The destination sign is read a minute past the crossing rather than
+    /// computed as "one more than the current one": a retrograde graha leaves
+    /// through the boundary behind it, so the sign it lands in is one *less* —
+    /// and at the sign boundary between Meena and Mesha either direction wraps.
+    private func computeRashiChanges(from date: Date) -> [RashiChange] {
+        let jd = wrapper.getJulianDayUTC(from: date)
+        return (0...8).compactMap { planet in
+            let changeJD = wrapper.calculateRashiChangeJD(forPlanet: Int32(planet), fromJulianDay: jd)
+            // Zero means the search ran its full window without finding one,
+            // which no real graha should do — but reporting nothing is the only
+            // honest answer if it happens.
+            guard changeJD > 0 else { return nil }
+            let justAfter = wrapper.calculatePlanetLongitude(forPlanet: Int32(planet),
+                                                             julianDay: changeJD + 1.0 / 1440.0)
+            return RashiChange(planetID: planet,
+                               date: jdToDate(changeJD),
+                               toRashi: Int(justAfter / 30.0) + 1)
+        }
+    }
 
     private func computeDailySummaries(from startDate: Date, to endDate: Date,
                                         latitude: Double, longitude: Double) -> [DailyPanchangSummary] {

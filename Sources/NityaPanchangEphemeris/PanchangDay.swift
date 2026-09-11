@@ -69,6 +69,30 @@ public enum MuhuratType: Sendable {
 
 // MARK: - Navagraha Position
 
+/// When a graha next changes sign — Rashi Parivartan.
+///
+/// Its own type, and its own fetch, rather than a field on `PlanetPosition`:
+/// searching for all nine costs about as much again as the whole panchang day
+/// it would ride along with (14.7ms against 25.7ms, measured at Ujjain for
+/// 11 September 2026), and every screen in the app pays for a panchang while
+/// only one card ever asks for this.
+public struct RashiChange: Identifiable, Sendable {
+    /// The graha, by the same ids `PlanetPosition` uses.
+    public var id: Int { planetID }
+    public let planetID: Int
+    public let date: Date
+    /// The sign it moves into, 1–12 — and not always the next one up. A
+    /// retrograde graha leaves through the boundary behind it, which is how
+    /// Rahu and Ketu always travel and how Venus or Mercury sometimes do.
+    public let toRashi: Int
+
+    public init(planetID: Int, date: Date, toRashi: Int) {
+        self.planetID = planetID
+        self.date = date
+        self.toRashi = toRashi
+    }
+}
+
 public struct PlanetPosition: Identifiable, Sendable {
     public let id: Int           // 0=Surya … 8=Ketu
     public let name: String      // "Surya"

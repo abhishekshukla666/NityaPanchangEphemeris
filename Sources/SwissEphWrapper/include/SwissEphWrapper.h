@@ -86,6 +86,21 @@ typedef struct {
 /// Each dict has: planetIndex (0–8), longitude (0–360), rashiNumber (1–12), degreesInSign (0–30).
 - (NSArray<NSDictionary *> *)calculatePlanetPositionsForJulianDay:(double)jd;
 
+/// The graha's sidereal longitude (0–360) at `jd`, by the same planet indices
+/// `calculatePlanetPositionsForJulianDay:` uses — 0 Sun, 1 Moon, 2 Mars,
+/// 3 Mercury, 4 Jupiter, 5 Venus, 6 Saturn, 7 Rahu, 8 Ketu. Returns -1 for an
+/// index outside those nine.
+- (double)calculatePlanetLongitudeForPlanet:(int)planetIndex julianDay:(double)jd;
+
+/// When the graha next changes rashi — Rashi Parivartan — as a Julian Day, or 0
+/// if it does not within the search window.
+///
+/// The window has to cover the worst case, which is not the average: Saturn
+/// crosses a sign in about two and a half years, but a retrograde loop
+/// straddling the boundary can hold it there for three. So the search runs to
+/// 1200 days for every graha and reports nothing rather than guessing.
+- (double)calculateRashiChangeJDForPlanet:(int)planetIndex fromJulianDay:(double)startJD;
+
 /// Returns the sidereal Ascendant (Lagna) longitude in degrees (0–360) using Lahiri ayanamsha.
 - (double)calculateAscendantAtJD:(double)jd latitude:(double)lat longitude:(double)lon;
 

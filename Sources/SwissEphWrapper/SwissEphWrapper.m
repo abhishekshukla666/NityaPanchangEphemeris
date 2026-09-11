@@ -578,6 +578,81 @@ static double NPRefineCrossing(double lastHolding, double firstNotHolding,
     return [result copy];
 }
 
+// MARK: - Rashi Parivartan (a graha's next sign change)
+
+// The nine grahas' greatest apparent speed in longitude, degrees per day, with a
+// little headroom. These are what make the scan below cheap: a graha cannot
+// leave its sign sooner than (degrees to the nearest boundary) / (its top
+// speed), so the search can stride that far without any risk of stepping over a
+// crossing. In the middle of a sign that lets Saturn jump a hundred days at a
+// time, and it closes to minutes as a boundary approaches — a fixed step fine
+// enough for the Moon would have cost eight thousand ephemeris calls for
+// Saturn's three-year worst case.
+//
+// Both directions count. A retrograde graha leaves through the boundary behind
+// it, so the stride is measured to whichever boundary is nearer.
+static const double NPMaxSpeedDegreesPerDay[9] = {
+    1.05,   // Sun
+    15.40,  // Moon
+    0.85,   // Mars
+    2.30,   // Mercury
+    0.26,   // Jupiter
+    1.30,   // Venus
+    0.14,   // Saturn
+    0.06,   // Rahu — the mean node moves uniformly
+    0.06    // Ketu
+};
+
+- (double)calculatePlanetLongitudeForPlanet:(int)planetIndex julianDay:(double)jd {
+    if (planetIndex < 0 || planetIndex > 8) { return -1.0; }
+    swe_set_sid_mode(SE_SIDM_LAHIRI, 0, 0);
+    long flags = SEFLG_SWIEPH | SEFLG_SIDEREAL | SEFLG_SPEED;
+    char errorMessage[256];
+    double pos[6];
+
+    // Same order as calculatePlanetPositionsForJulianDay:, which is not the
+    // Swiss Ephemeris' own — Mars precedes Mercury here.
+    int seIds[7] = { SE_SUN, SE_MOON, SE_MARS, SE_MERCURY, SE_JUPITER, SE_VENUS, SE_SATURN };
+    int seId = planetIndex < 7 ? seIds[planetIndex] : SE_MEAN_NODE;
+
+    swe_calc_ut(jd, seId, flags, pos, errorMessage);
+    double lon = pos[0];
+    // Ketu is Rahu's opposite point, computed rather than looked up.
+    if (planetIndex == 8) { lon += 180.0; }
+    while (lon <    0.0) { lon += 360.0; }
+    while (lon >= 360.0) { lon -= 360.0; }
+    return lon;
+}
+
+- (double)calculateRashiChangeJDForPlanet:(int)planetIndex fromJulianDay:(double)startJD {
+    if (planetIndex < 0 || planetIndex > 8) { return 0.0; }
+
+    int (^rashiAt)(double) = ^int(double jd) {
+        return (int)([self calculatePlanetLongitudeForPlanet:planetIndex julianDay:jd] / 30.0) + 1;
+    };
+
+    int startingRashi = rashiAt(startJD);
+    double maxSpeed = NPMaxSpeedDegreesPerDay[planetIndex];
+    double searchJD = startJD;
+    double limitJD  = startJD + 1200.0;
+
+    while (searchJD < limitJD) {
+        double lon = [self calculatePlanetLongitudeForPlanet:planetIndex julianDay:searchJD];
+        double intoSign = fmod(lon, 30.0);
+        double toNearestBoundary = fmin(intoSign, 30.0 - intoSign);
+        // A minute's floor so a graha sitting exactly on a boundary still
+        // advances; without it the stride is zero and the loop never ends.
+        double stride = fmax(toNearestBoundary / maxSpeed, 1.0 / 1440.0);
+
+        double nextJD = searchJD + stride;
+        if (rashiAt(nextJD) != startingRashi) {
+            return NPRefineCrossing(searchJD, nextJD, startingRashi, rashiAt);
+        }
+        searchJD = nextJD;
+    }
+    return 0.0;
+}
+
 // MARK: - Ascendant (Lagna)
 
 - (double)calculateAscendantAtJD:(double)jd latitude:(double)lat longitude:(double)lon {

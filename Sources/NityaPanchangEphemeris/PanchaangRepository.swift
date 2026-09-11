@@ -35,6 +35,15 @@ public protocol PanchaangRepository: Sendable {
     /// own multi-day rules (e.g. Muhurat finding) against a date range.
     func fetchDailyPanchangSummaries(from startDate: Date, to endDate: Date,
                                       latitude: Double, longitude: Double) async -> [DailyPanchangSummary]
+
+    /// When each of the nine grahas next changes sign, searching forward from
+    /// `date`. Omits a graha whose crossing is not found inside the search
+    /// window rather than reporting the window's own end as an answer.
+    ///
+    /// Deliberately not part of `fetchPanchang`. It costs about as much again
+    /// as a whole panchang day, and needs no location at all — a sign change is
+    /// the same instant everywhere.
+    func fetchRashiChanges(from date: Date) async -> [RashiChange]
 }
 
 public extension PanchaangRepository {
@@ -45,4 +54,7 @@ public extension PanchaangRepository {
                                       latitude: Double, longitude: Double) async -> [DailyPanchangSummary] {
         []
     }
+
+    /// Same no-op, for the same reason.
+    func fetchRashiChanges(from date: Date) async -> [RashiChange] { [] }
 }
