@@ -699,8 +699,14 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 // (midnight/pradosh/aparahna, all within ~a day of sunrise) cannot be either.
                 // (We check >= 28 to handle the wrap-around from Amavasya to Pratipada.)
                 func nearSunrise() -> Bool {
-                    let diff = abs(tithiSunrise - rule.tithiNumber)
-                    return diff <= 2 || diff >= 28
+                    // A ranged rule is near sunrise if ANY tithi in its range
+                    // is — measuring only from the lower bound would discard a
+                    // week-wide rule five days before it was due to fire.
+                    let upper = rule.tithiUpperBound ?? rule.tithiNumber
+                    return (rule.tithiNumber...upper).contains(where: { target in
+                        let diff = abs(tithiSunrise - target)
+                        return diff <= 2 || diff >= 28
+                    })
                 }
 
                 switch rule.observationTime {
@@ -830,14 +836,22 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 // Fast-Fail: Skip if it's Adhik Maas or an invalid month
                 guard !isAdhik, (1...12).contains(activeMonth) else { continue }
 
-                // Check for an exact match
-                if rule.lunarMonth == activeMonth && rule.tithiNumber == activeTithi {
+                // A rule defined by weekday — Varalakshmi Vratam is the Friday
+                // before Shravana Purnima — only fires on that weekday. Checked
+                // against the day being evaluated, in the reference zone the
+                // rest of this computation already uses.
+                if let weekday = rule.weekday,
+                   cal.component(.weekday, from: startOfDay) != weekday { continue }
+
+                // Check for a match
+                if rule.lunarMonth == activeMonth && rule.matches(tithi: activeTithi) {
                     // Vriddhi: when the tithi also holds tomorrow's sunrise,
                     // an Ekadashi belongs to that second day, not this first
                     // one — today is the Dashami-viddha side. Everything else
                     // keeps the first sunrise it touches, which is what the
                     // `seen` set already gives it.
-                    if rule.resolvesForward, rule.observationTime == .sunrise,
+                    if rule.resolvesForward, rule.tithiUpperBound == nil,
+                       rule.observationTime == .sunrise,
                        let tomorrow = cal.date(byAdding: .day, value: 1, to: startOfDay),
                        Int(wrapper.calculateTithiNumber(forJulianDay: referenceSunriseJD(for: tomorrow))) == rule.tithiNumber {
                         continue
@@ -851,7 +865,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                                 name: rule.name,
                                 date: current,
                                 emoji: rule.emoji,
-                                hasIcon: rule.hasIcon
+                                hasIcon: rule.hasIcon,
+                                regions: rule.regions
                             )
                         )
                     }
@@ -880,11 +895,13 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         let windowEnd   = cal.startOfDay(for: endDate)
         for year in cal.component(.year, from: startDate)...cal.component(.year, from: endDate) {
             let mesha = solarIngressJD(year: year, month: 4, day: 8, targetLongitude: 0)
-            var computed: [(String, Date, String)] = []
+            // The fourth element is the region, defaulted at each append that
+            // does not care — these are mostly nationally-kept days.
+            var computed: [(name: String, date: Date, emoji: String, regions: FestivalRegion)] = []
 
             if let jd = solarIngressJD(year: year, month: 1, day: 10, targetLongitude: 270) {
                 let makarSankranti = sankrantiDeferringPastSunset(ingressJD: jd)
-                computed.append(("Makar Sankranti", makarSankranti, "🌾"))
+                computed.append(("Makar Sankranti", makarSankranti, "🌾", .all))
 
                 // Lohri is the last night of Poh — the eve of Maghi — so it follows the
                 // Sankranti rather than sitting on a fixed 13 January, which is the same
@@ -898,24 +915,46 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 // which is what settles 2023: the ingress was on the 14th at 20:45 IST,
                 // after sunset, so Maghi deferred to the 15th and Lohri moved with it.
                 if let lohri = cal.date(byAdding: .day, value: -1, to: makarSankranti) {
-                    computed.append(("Lohri", lohri, "🔥"))
+                    computed.append(("Lohri", lohri, "🔥", .all))
+                }
+
+                // The Telugu Sankranti is three days, and the outer two are
+                // taken from the middle one for the same reason Lohri is: they
+                // are defined as its eve and its morrow, not as fixed dates, so
+                // they follow it into the years it falls on the 15th.
+                if let bhogi = cal.date(byAdding: .day, value: -1, to: makarSankranti) {
+                    computed.append(("Bhogi", bhogi, "🔥", FestivalRegion.telugu))
+                }
+                if let kanuma = cal.date(byAdding: .day, value: 1, to: makarSankranti) {
+                    computed.append(("Kanuma", kanuma, "🐄", FestivalRegion.telugu))
                 }
             }
+
+            // The other two cardinal ingresses. Karka opens Dakshinayana and
+            // Tula opens the second half of the ritual year; both are seasonal
+            // markers kept across regions rather than a single region's day.
+            if let jd = solarIngressJD(year: year, month: 7, day: 12, targetLongitude: 90) {
+                computed.append(("Karka Sankranti", sankrantiByHinduDay(ingressJD: jd), "🌧️", .all))
+            }
+            if let jd = solarIngressJD(year: year, month: 10, day: 13, targetLongitude: 180) {
+                computed.append(("Tula Sankranti", sankrantiByHinduDay(ingressJD: jd), "🍂", .all))
+            }
             if let jd = solarIngressJD(year: year, month: 9, day: 12, targetLongitude: 150) {
-                computed.append(("Vishwakarma Puja", sankrantiDeferringPastSunset(ingressJD: jd), "🛠️"))
+                computed.append(("Vishwakarma Puja", sankrantiDeferringPastSunset(ingressJD: jd), "🛠️", .all))
             }
             if let jd = mesha {
-                computed.append(("Baisakhi",        sankrantiByHinduDay(ingressJD: jd), "🌾"))
-                computed.append(("Solar New Year",  sankrantiByHinduDay(ingressJD: jd), "☀️"))
+                computed.append(("Baisakhi",        sankrantiByHinduDay(ingressJD: jd), "🌾", .all))
+                computed.append(("Solar New Year",  sankrantiByHinduDay(ingressJD: jd), "☀️", .all))
             }
             if let date = goodFriday(year: year) {
-                computed.append(("Good Friday", date, "✝️"))
+                computed.append(("Good Friday", date, "✝️", .all))
             }
 
-            for (name, date, emoji) in computed {
+            for (name, date, emoji, regions) in computed {
                 guard date >= windowStart, date <= windowEnd,
                       seen.insert("\(name)-\(year)").inserted else { continue }
-                festivals.append(HinduFestival(name: name, date: date, emoji: emoji, hasIcon: false))
+                festivals.append(HinduFestival(name: name, date: date, emoji: emoji,
+                                               hasIcon: false, regions: regions))
             }
         }
 

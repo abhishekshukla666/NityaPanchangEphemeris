@@ -21,6 +21,37 @@ public enum ObservationTime: Sendable {
                      // between the two.
 }
 
+
+// MARK: - Region
+
+/// Which regional calendar keeps a festival.
+///
+/// A set rather than a single value: most days are kept everywhere, and the
+/// ones that are not are often kept in two regions but not a third. Bestu
+/// Varas is Gujarat's new year on the same day Karnataka keeps Balipadyami,
+/// and both fall on the Kartika Shukla Pratipada the north calls Govardhan
+/// Puja — one date, three names, three audiences.
+///
+/// Existing rules are all `.all`, deliberately. Tagging the Hindi-belt days
+/// (Chhath, Karwa Chauth, Ahoi Ashtami) as north-only would silently remove
+/// festivals that readers of the shipped app already see, which is a decision
+/// for the app's owner rather than a side effect of adding three languages.
+/// Narrowing them later is a one-word change per rule.
+public struct FestivalRegion: OptionSet, Sendable, Hashable {
+    public let rawValue: Int
+    public init(rawValue: Int) { self.rawValue = rawValue }
+
+    public static let north     = FestivalRegion(rawValue: 1 << 0)
+    public static let gujarat   = FestivalRegion(rawValue: 1 << 1)
+    public static let karnataka = FestivalRegion(rawValue: 1 << 2)
+    public static let telugu    = FestivalRegion(rawValue: 1 << 3)
+
+    /// Kept everywhere the app is read.
+    public static let all: FestivalRegion = [.north, .gujarat, .karnataka, .telugu]
+    /// The two southern calendars, which share most of what the north does not.
+    public static let south: FestivalRegion = [.karnataka, .telugu]
+}
+
 // MARK: - Festival Entity
 
 public struct HinduFestival: Identifiable, Sendable {
@@ -29,12 +60,18 @@ public struct HinduFestival: Identifiable, Sendable {
     public let date:  Date
     public let emoji: String
     public let hasIcon: Bool
+    /// Where this day is kept. Defaulted so every existing call site — and any
+    /// caller that does not care — keeps compiling and keeps meaning "kept
+    /// everywhere".
+    public let regions: FestivalRegion
 
-    public init(name: String, date: Date, emoji: String, hasIcon: Bool) {
+    public init(name: String, date: Date, emoji: String, hasIcon: Bool,
+                regions: FestivalRegion = .all) {
         self.name = name
         self.date = date
         self.emoji = emoji
         self.hasIcon = hasIcon
+        self.regions = regions
     }
 }
 
@@ -49,6 +86,20 @@ public struct FestivalRule: Sendable {
     public let tithiNumber: Int   // 1–30
     public var hasIcon: Bool = false
     public var observationTime: ObservationTime = .sunrise
+    public var regions: FestivalRegion = .all
+
+    /// Upper bound when the rule matches a RANGE of tithis rather than one.
+    ///
+    /// Varalakshmi Vratam is the Friday before Shravana Purnima, which is not
+    /// a tithi at all — it is whichever tithi that Friday happens to land on.
+    /// Pairing a range with `weekday` expresses it exactly: the Friday whose
+    /// tithi falls in the week before the full moon, and there is only ever one.
+    public var tithiUpperBound: Int?
+
+    /// Gregorian weekday (1 = Sunday, as `Calendar.component(.weekday:)`
+    /// reports it) the day must fall on, when the observance is defined by the
+    /// weekday rather than by the tithi alone.
+    public var weekday: Int?
 
     /// A vriddhi Ekadashi — one whose tithi is current at two consecutive
     /// sunrises — is kept on the **second** day, not the first.
@@ -69,13 +120,24 @@ public struct FestivalRule: Sendable {
     public var resolvesForward: Bool { tithiNumber == 11 || tithiNumber == 26 }
 
     public init(name: String, emoji: String, lunarMonth: Int, tithiNumber: Int,
-                hasIcon: Bool = false, observationTime: ObservationTime = .sunrise) {
+                hasIcon: Bool = false, observationTime: ObservationTime = .sunrise,
+                regions: FestivalRegion = .all,
+                tithiUpperBound: Int? = nil, weekday: Int? = nil) {
         self.name = name
         self.emoji = emoji
         self.lunarMonth = lunarMonth
         self.tithiNumber = tithiNumber
         self.hasIcon = hasIcon
         self.observationTime = observationTime
+        self.regions = regions
+        self.tithiUpperBound = tithiUpperBound
+        self.weekday = weekday
+    }
+
+    /// Whether `tithi` satisfies this rule, single value or range.
+    public func matches(tithi: Int) -> Bool {
+        guard let upper = tithiUpperBound else { return tithi == tithiNumber }
+        return (tithiNumber...upper).contains(tithi)
     }
 }
 
@@ -90,7 +152,13 @@ public struct FestivalRule: Sendable {
 //   Krishna 1–14 + Amavasya  = tithis  1–15  (dark fortnight, opens the month)
 //   Shukla  1–14 + Purnima   = tithis 16–30  (bright fortnight, closes the month)
 
-public let allFestivalRules: [FestivalRule] = [
+/// Every tithi-derived rule the engine evaluates: the pan-Indian table plus
+/// the regional one. Kept as a computed join rather than by pasting the
+/// regional days into the main table, so "which of these is regional" stays
+/// answerable by reading one list.
+public let allFestivalRules: [FestivalRule] = panIndianFestivalRules + regionalFestivalRules
+
+public let panIndianFestivalRules: [FestivalRule] = [
 
     // ── Chaitra (1) ── [KP after Phalguna Purnima] + [SP → Chaitra Purnima] ──
     FestivalRule(name: "Sheetala Ashtami",     emoji: "🙏", lunarMonth: 1,  tithiNumber: 8),
@@ -417,6 +485,61 @@ public struct StaticFestivalRule: Sendable {
         self.hasIcon = hasIcon
     }
 }
+
+
+// MARK: - Regional Festival Rules
+//
+// Days kept in one regional calendar but not across all of them. Tithi numbers
+// follow the same Purnimanta convention as the table above — Krishna 1–15,
+// Shukla 16–30 — because every rule in this file matches on the Purnimanta
+// month the ephemeris carries, whatever convention the app happens to display.
+//
+// Several of these fall on a day the main table already names: Bestu Varas is
+// the Kartika Shukla Pratipada the north calls Govardhan Puja, Gowri Habba the
+// Bhadrapada Shukla Tritiya the north calls Hartalika Teej. They are separate
+// rules rather than aliases because a Gujarati reader looking for their new
+// year will not find it under "Govardhan Puja", and the two are genuinely
+// different observances that happen to share a date.
+
+public let regionalFestivalRules: [FestivalRule] = [
+
+    // ── Gujarat ───────────────────────────────────────────────────────────
+    // Bestu Varas opens the Gujarati year on Kartika Shukla Pratipada — the
+    // day after Diwali, not the Chaitra new year the Deccan keeps.
+    FestivalRule(name: "Bestu Varas",       emoji: "🪔", lunarMonth: 8, tithiNumber: 16, regions: .gujarat),
+    FestivalRule(name: "Labh Pancham",      emoji: "📿", lunarMonth: 8, tithiNumber: 20, regions: .gujarat),
+    FestivalRule(name: "Vagh Baras",        emoji: "🐄", lunarMonth: 8, tithiNumber: 12, regions: .gujarat),
+    FestivalRule(name: "Jaya Parvati Vrat", emoji: "🌺", lunarMonth: 4, tithiNumber: 28, regions: .gujarat),
+    FestivalRule(name: "Randhan Chhath",    emoji: "🍲", lunarMonth: 5, tithiNumber: 6,  regions: .gujarat),
+    FestivalRule(name: "Shitala Satam",     emoji: "🙏", lunarMonth: 5, tithiNumber: 7,  regions: .gujarat),
+
+    // ── Karnataka ─────────────────────────────────────────────────────────
+    // Gowri Habba is the day before Ganesha Chaturthi — Gauri is received on
+    // the Tritiya and her son follows on the Chaturthi.
+    FestivalRule(name: "Gowri Habba",       emoji: "🌺", lunarMonth: 6, tithiNumber: 18, regions: .karnataka),
+    FestivalRule(name: "Ayudha Puja",       emoji: "🛠️", lunarMonth: 7, tithiNumber: 24, regions: [.karnataka, .telugu]),
+    FestivalRule(name: "Basava Jayanti",    emoji: "🙏", lunarMonth: 2, tithiNumber: 18, regions: .karnataka),
+    FestivalRule(name: "Balipadyami",       emoji: "🪔", lunarMonth: 8, tithiNumber: 16, regions: .karnataka),
+
+    // ── Telugu ────────────────────────────────────────────────────────────
+    // Bathukamma runs the nine nights from Bhadrapada Amavasya; this marks the
+    // first (Engili Pula) day, which is how a calendar prints it.
+    FestivalRule(name: "Bathukamma",        emoji: "💐", lunarMonth: 7, tithiNumber: 15, regions: .telugu),
+    FestivalRule(name: "Atla Tadde",        emoji: "🥞", lunarMonth: 7, tithiNumber: 3,  regions: .telugu),
+    FestivalRule(name: "Nagula Chavithi",   emoji: "🐍", lunarMonth: 8, tithiNumber: 19, regions: .telugu),
+    FestivalRule(name: "Boddemma",          emoji: "💐", lunarMonth: 6, tithiNumber: 23, regions: .telugu),
+
+    // ── Shared by both southern calendars ─────────────────────────────────
+    // Varalakshmi Vratam is the Friday before Shravana Purnima, so it is dated
+    // by weekday rather than by tithi — the range is the week that precedes the
+    // full moon, and exactly one Friday falls inside it.
+    FestivalRule(name: "Varalakshmi Vratam", emoji: "🪷", lunarMonth: 5,
+                 tithiNumber: 23, regions: .south, tithiUpperBound: 29, weekday: 6),
+    // Vaikuntha Ekadashi is the Mokshada Ekadashi of Margashirsha under the
+    // name the south keeps it by, and the one day of the year the Vaikuntha
+    // Dwara is opened.
+    FestivalRule(name: "Vaikuntha Ekadashi", emoji: "🛕", lunarMonth: 9, tithiNumber: 26, regions: .south),
+]
 
 // National holidays and universally observed fixed-date festivals for India.
 public let allStaticFestivalRules: [StaticFestivalRule] = [
