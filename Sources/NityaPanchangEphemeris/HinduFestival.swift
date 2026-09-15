@@ -285,7 +285,14 @@ public let panIndianFestivalRules: [FestivalRule] = [
         hasIcon: true,
         observationTime: .madhyahna
     ),
-    FestivalRule(name: "Rishi Panchami",       emoji: "🌸", lunarMonth: 6,  tithiNumber: 20),
+    // Rishi Panchami is madhyahna-vyapini: the Panchami that prevails at
+    // MIDDAY, not the one current at sunrise. The two pick different days
+    // whenever the tithi turns over during the morning, which is common —
+    // in 2026 Panchami begins 07:44 on the 15th and ends 08:59 on the 16th,
+    // so it covers midday on the 15th and is long gone by midday on the 16th.
+    // Under the sunrise rule this landed a day late.
+    FestivalRule(name: "Rishi Panchami",       emoji: "🌸", lunarMonth: 6,  tithiNumber: 20,
+                 observationTime: .madhyahna),
     FestivalRule(name: "Radha Ashtami",        emoji: "🪈", lunarMonth: 6,  tithiNumber: 23),
     FestivalRule(
         name: "Anant Chaturdashi",

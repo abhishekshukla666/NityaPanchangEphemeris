@@ -133,4 +133,23 @@ final class RegionalFestivalTests: XCTestCase {
         XCTAssertTrue(diwali?.regions.contains(.maharashtra) ?? false)
         XCTAssertEqual(diwali?.regions, .all)
     }
+
+    /// Rishi Panchami takes the Panchami prevailing at MIDDAY, not at sunrise.
+    ///
+    /// In 2026 that Panchami begins 07:44 on 15 September and ends 08:59 on
+    /// the 16th, so it is current at sunrise on the 16th but covers midday
+    /// only on the 15th. Reading it by sunrise put the festival a day late.
+    func testRishiPanchamiIsMadhyahnaNotSunrise() async {
+        let all = await festivals(2026)
+        guard let rishi = all.first(where: { $0.name == "Rishi Panchami" })?.date,
+              let ganesh = all.first(where: { $0.name == "Ganesh Chaturthi" })?.date
+        else { return XCTFail("Rishi Panchami or Ganesh Chaturthi missing") }
+        let cal = Calendar.current
+        XCTAssertEqual(cal.component(.month, from: rishi), 9)
+        XCTAssertEqual(cal.component(.day, from: rishi), 15)
+        // Shukla Chaturthi then Shukla Panchami: consecutive tithis, and in
+        // this year consecutive days too.
+        let gap = cal.dateComponents([.day], from: ganesh, to: rishi).day
+        XCTAssertEqual(gap, 1, "Rishi Panchami should follow Ganesh Chaturthi here")
+    }
 }
