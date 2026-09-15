@@ -45,11 +45,20 @@ public struct FestivalRegion: OptionSet, Sendable, Hashable {
     public static let gujarat   = FestivalRegion(rawValue: 1 << 1)
     public static let karnataka = FestivalRegion(rawValue: 1 << 2)
     public static let telugu    = FestivalRegion(rawValue: 1 << 3)
+    public static let maharashtra = FestivalRegion(rawValue: 1 << 4)
 
     /// Kept everywhere the app is read.
-    public static let all: FestivalRegion = [.north, .gujarat, .karnataka, .telugu]
+    ///
+    /// Adding a region to this set widens every existing `.all` rule to the new
+    /// audience, which is what you want: a pan-Indian festival does not stop
+    /// being pan-Indian because one more calendar can now be selected.
+    public static let all: FestivalRegion = [.north, .gujarat, .karnataka, .telugu, .maharashtra]
     /// The two southern calendars, which share most of what the north does not.
     public static let south: FestivalRegion = [.karnataka, .telugu]
+    /// Maharashtra keeps Amanta months like the south, but its festival
+    /// calendar sits closer to the Deccan than to either — so it is its own
+    /// bit rather than a member of `.south`.
+    public static let deccan: FestivalRegion = [.karnataka, .maharashtra]
 }
 
 // MARK: - Festival Entity
@@ -516,6 +525,9 @@ public let regionalFestivalRules: [FestivalRule] = [
     FestivalRule(name: "Jaya Parvati Vrat", emoji: "🌺", lunarMonth: 4, tithiNumber: 28, regions: .gujarat),
     FestivalRule(name: "Randhan Chhath",    emoji: "🍲", lunarMonth: 5, tithiNumber: 6,  regions: .gujarat),
     FestivalRule(name: "Shitala Satam",     emoji: "🙏", lunarMonth: 5, tithiNumber: 7,  regions: .gujarat),
+    // Kutchi new year, the Ashadha Shukla Dwitiya that is also Rath Yatra.
+    FestivalRule(name: "Ashadhi Beej",      emoji: "🌾", lunarMonth: 4, tithiNumber: 17, regions: .gujarat),
+    FestivalRule(name: "Bhadarvi Poonam",   emoji: "🌝", lunarMonth: 6, tithiNumber: 30, regions: .gujarat),
 
     // ── Karnataka ─────────────────────────────────────────────────────────
     // Gowri Habba is the day before Ganesha Chaturthi — Gauri is received on
@@ -532,6 +544,30 @@ public let regionalFestivalRules: [FestivalRule] = [
     FestivalRule(name: "Atla Tadde",        emoji: "🥞", lunarMonth: 7, tithiNumber: 3,  regions: .telugu),
     FestivalRule(name: "Nagula Chavithi",   emoji: "🐍", lunarMonth: 8, tithiNumber: 19, regions: .telugu),
     FestivalRule(name: "Boddemma",          emoji: "💐", lunarMonth: 6, tithiNumber: 23, regions: .telugu),
+    // The same Shravana Amavasya Maharashtra keeps as Bail Pola.
+    FestivalRule(name: "Polala Amavasya",   emoji: "🐄", lunarMonth: 6, tithiNumber: 15, regions: .telugu),
+
+    // ── Maharashtra ───────────────────────────────────────────────────────
+    // Narali Purnima is the Shravana Purnima the north keeps as Raksha
+    // Bandhan: the coconut offered to the sea closes the monsoon fishing
+    // ban. One day, two observances, and both are listed.
+    FestivalRule(name: "Narali Purnima",    emoji: "🥥", lunarMonth: 5, tithiNumber: 30, regions: .maharashtra),
+    // Bail Pola honours the bullocks on the Shravana Amavasya -- which is the
+    // Bhadrapada Krishna Amavasya by the Purnimanta month these rules count in.
+    FestivalRule(name: "Bail Pola",         emoji: "🐂", lunarMonth: 6, tithiNumber: 15, regions: .maharashtra),
+    // Five days after Holi, so the Chaitra Krishna Panchami that follows the
+    // Phalguna Purnima, not a Phalguna tithi.
+    FestivalRule(name: "Rang Panchami",     emoji: "🎨", lunarMonth: 1, tithiNumber: 5,  regions: .maharashtra),
+    FestivalRule(name: "Datta Jayanti",     emoji: "🕉️", lunarMonth: 9, tithiNumber: 30, regions: .maharashtra),
+    // Maghi Ganesh Jayanti, the winter one -- distinct from the Bhadrapada
+    // Ganesh Chaturthi every region keeps.
+    FestivalRule(name: "Ganesh Jayanti",    emoji: "🐘", lunarMonth: 11, tithiNumber: 19, regions: .maharashtra),
+
+    // ── Maharashtra and Karnataka ─────────────────────────────────────────
+    // The Margashirsha Shukla Shashthi of Khandoba and of Subrahmanya are the
+    // same day under two names; each region is given its own.
+    FestivalRule(name: "Champa Shashthi",   emoji: "🙏", lunarMonth: 9, tithiNumber: 21, regions: .maharashtra),
+    FestivalRule(name: "Subrahmanya Shashti", emoji: "🐍", lunarMonth: 9, tithiNumber: 21, regions: .karnataka),
 
     // ── Shared by both southern calendars ─────────────────────────────────
     // Varalakshmi Vratam is the Friday before Shravana Purnima, so it is dated

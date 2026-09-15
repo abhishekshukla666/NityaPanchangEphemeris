@@ -1125,8 +1125,14 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                             let calYear = cal.component(.year, from: prev.date)
                             let key = "\(rule.name)-\(calYear)"
                             if seen.insert(key).inserted {
+                                // regions must be carried here too. Without it a
+                                // festival whose tithi is kshaya that year came
+                                // back as .all and appeared for every reader --
+                                // Datta Jayanti did exactly that in 2026, when
+                                // the Margashirsha Purnima is skipped.
                                 fallback.append(HinduFestival(name: rule.name, date: prev.date,
-                                                              emoji: rule.emoji, hasIcon: rule.hasIcon))
+                                                              emoji: rule.emoji, hasIcon: rule.hasIcon,
+                                                              regions: rule.regions))
                             }
                         }
                     }

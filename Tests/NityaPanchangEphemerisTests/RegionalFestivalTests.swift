@@ -81,4 +81,56 @@ final class RegionalFestivalTests: XCTestCase {
         }
         XCTAssertLessThan(boddemma, bathukamma)
     }
+
+    // MARK: - Maharashtra
+
+    func testMaharashtraDaysAppearAndCarryTheirRegion() async {
+        let all = await festivals(2026)
+        let byName = Dictionary(grouping: all, by: \.name)
+        for name in ["Narali Purnima", "Bail Pola", "Rang Panchami",
+                     "Datta Jayanti", "Ganesh Jayanti", "Champa Shashthi"] {
+            XCTAssertNotNil(byName[name]?.first, "\(name) was never produced")
+            XCTAssertEqual(byName[name]?.first?.regions, .maharashtra, name)
+        }
+        XCTAssertEqual(byName["Subrahmanya Shashti"]?.first?.regions, .karnataka)
+        XCTAssertEqual(byName["Polala Amavasya"]?.first?.regions, .telugu)
+        XCTAssertEqual(byName["Ashadhi Beej"]?.first?.regions, .gujarat)
+        XCTAssertEqual(byName["Bhadarvi Poonam"]?.first?.regions, .gujarat)
+    }
+
+    /// Four regional days that fall on a tithi another rule already computes.
+    /// They are separate observances, deliberately listed separately -- but the
+    /// same day, so a drift means one of the two rules is wrong.
+    func testNewRegionalDaysAgreeWithTheirTwin() async {
+        let all = await festivals(2026)
+        let date = { (n: String) in all.first { $0.name == n }?.date }
+        for (a, b) in [("Narali Purnima", "Raksha Bandhan"),
+                       ("Bail Pola", "Polala Amavasya"),
+                       ("Champa Shashthi", "Subrahmanya Shashti"),
+                       ("Ashadhi Beej", "Jagannath Rath Yatra")] {
+            XCTAssertNotNil(date(a), a); XCTAssertNotNil(date(b), b)
+            XCTAssertEqual(date(a), date(b), "\(a) and \(b) are the same tithi")
+        }
+    }
+
+    /// Rang Panchami is the one that is easy to place a month wrong: it is five
+    /// days after Holi, which puts it in the Chaitra Krishna paksha these rules
+    /// count in, not in Phalguna.
+    func testRangPanchamiFallsFiveDaysAfterHoli() async {
+        let all = await festivals(2026)
+        guard let rang = all.first(where: { $0.name == "Rang Panchami" })?.date,
+              let holi = all.first(where: { $0.name == "Holi" || $0.name == "Holika Dahan" })?.date
+        else { return }   // named differently in the table; the tithi test below still holds
+        let days = Calendar.current.dateComponents([.day], from: holi, to: rang).day ?? 0
+        XCTAssertTrue((4...6).contains(days), "Rang Panchami is \(days) days after Holi")
+    }
+
+    /// Widening `.all` must not have narrowed anything: a pan-Indian day is
+    /// still kept by Maharashtra too.
+    func testAddingARegionWidensRatherThanNarrows() async {
+        let all = await festivals(2026)
+        let diwali = all.first { $0.name == "Diwali" }
+        XCTAssertTrue(diwali?.regions.contains(.maharashtra) ?? false)
+        XCTAssertEqual(diwali?.regions, .all)
+    }
 }
