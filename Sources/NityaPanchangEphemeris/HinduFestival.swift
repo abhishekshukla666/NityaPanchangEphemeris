@@ -460,7 +460,7 @@ public let panIndianFestivalRules: [FestivalRule] = [
 
     // 6. Bhadrapada
     FestivalRule(name: "Aja Ekadashi",        emoji: "🛕", lunarMonth: 6, tithiNumber: 11),
-    FestivalRule(name: "Parivartini Ekadashi",emoji: "🛕", lunarMonth: 6, tithiNumber: 26),
+    FestivalRule(name: "Parsva Ekadashi",emoji: "🛕", lunarMonth: 6, tithiNumber: 26),
 
     // 7. Ashwina
     FestivalRule(name: "Indira Ekadashi",     emoji: "🛕", lunarMonth: 7, tithiNumber: 11),

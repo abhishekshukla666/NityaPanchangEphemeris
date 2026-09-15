@@ -400,7 +400,7 @@ final class NityaPanchangEphemerisTests: XCTestCase {
     /// greater part of it — it does NOT move forward like a vriddhi one.
     func testKshayaEkadashiStaysOnTheDayThatHeldIt() async throws {
         let repo = EphemerisPanchaangRepository()
-        try await assertFestival(repo, "Parivartini Ekadashi", on: (2023, 9, 25))
+        try await assertFestival(repo, "Parsva Ekadashi", on: (2023, 9, 25))
         try await assertFestival(repo, "Yogini Ekadashi",      on: (2025, 6, 21))
     }
 
