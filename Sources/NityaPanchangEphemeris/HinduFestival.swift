@@ -369,7 +369,11 @@ public let panIndianFestivalRules: [FestivalRule] = [
     ),
     FestivalRule(name: "Chhath Puja",          emoji: "☀️", lunarMonth: 8,  tithiNumber: 21),
     FestivalRule(name: "Gopashtami",           emoji: "🐄", lunarMonth: 8,  tithiNumber: 23),
-    FestivalRule(name: "Dev Uthani Ekadashi",  emoji: "🛕", lunarMonth: 8,  tithiNumber: 26),
+    // Kartika Shukla Ekadashi is listed once, in the 24 Ekadashis below, as
+    // "Devutthana Ekadashi" -- the spelling PanchaangHelper's Ekadashi table
+    // also uses. A second rule here under "Dev Uthani Ekadashi" put the same
+    // day in the list twice, which Hindi showed as two names and Kannada,
+    // Telugu and Gujarati showed as the same name twice.
     FestivalRule(name: "Tulsi Vivah",          emoji: "🌿", lunarMonth: 8,  tithiNumber: 27),
     FestivalRule(
         name: "Guru Nanak Jayanti",
