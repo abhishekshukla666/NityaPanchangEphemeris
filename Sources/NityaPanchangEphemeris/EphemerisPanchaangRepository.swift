@@ -368,6 +368,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                                          endTime: karanaPeriods.first?.endTime),
             vara:              PanchaangHelper.getVaraName(for: dayStart),
             moonRashi:         moonRashi,
+            moonRashiNumber:   rashiNum,
             muhurats:          muhurats,
             chaughariya:       chaughariya,
             nightChaughariya:  nightChaughariya,

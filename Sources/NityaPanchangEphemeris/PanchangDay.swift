@@ -219,6 +219,13 @@ public struct PanchangDay: Sendable {
     public let karana: MinorLimb
     public let vara: String
     public let moonRashi: String            // e.g. "♉ Taurus"
+    /// The same sign as a number, 1–12, Aries…Pisces.
+    ///
+    /// Carried beside the label because a rule has to be able to ASK which sign
+    /// this is. Panchak is the Moon in Kumbha or Meena, and deciding that by
+    /// looking for "Aquarius" inside a display string would be a rule that
+    /// breaks the day someone translates the label.
+    public let moonRashiNumber: Int
 
     public let muhurats: [Muhurat]
     public let chaughariya: [Muhurat]       // 8 equal daytime Choghadiya periods (sunrise→sunset)
@@ -287,7 +294,7 @@ public struct PanchangDay: Sendable {
     public init(date: Date, lunarMonth: String, lunarMonthNumber: Int, isAdhikMaas: Bool,
                 sunrise: Date, sunset: Date, moonrise: Date?, moonset: Date?,
                 tithi: Tithi, tithiNumber: Int, nakshatra: Nakshatra, yoga: MinorLimb, karana: MinorLimb,
-                vara: String, moonRashi: String, muhurats: [Muhurat], chaughariya: [Muhurat],
+                vara: String, moonRashi: String, moonRashiNumber: Int, muhurats: [Muhurat], chaughariya: [Muhurat],
                 nightChaughariya: [Muhurat], planetPositions: [PlanetPosition],
                 vedaAyana: String, raviYoga: Bool, horas: [HoraInfo], lagnas: [LagnaPeriod],
                 bhadraKaal: Muhurat? = nil, amantaMonth: String = "", isPradoshVrat: Bool = false,
@@ -309,6 +316,7 @@ public struct PanchangDay: Sendable {
         self.karana = karana
         self.vara = vara
         self.moonRashi = moonRashi
+        self.moonRashiNumber = moonRashiNumber
         self.muhurats = muhurats
         self.chaughariya = chaughariya
         self.nightChaughariya = nightChaughariya
