@@ -104,6 +104,28 @@ final class PanchakTests: XCTestCase {
         }
     }
 
+    /// The boundary itself, to the minute, for the period current when this was
+    /// written: the Moon leaves Makara at 21:57 IST on 23 September 2026.
+    ///
+    /// The DAY that opens Panchak is not the day it first matches — the match is
+    /// read at sunrise, and this boundary falls well after it, so 24 September is
+    /// the first matching day while the period begins on the 23rd. Both apps
+    /// print the boundary beside a date, and printing the 24th next to 9:57 PM
+    /// named a moment that does not exist on that date.
+    func testTheMomentPanchakOpens() async {
+        let day = await repo.fetchPanchang(for: ist.date(from: DateComponents(year: 2026, month: 9, day: 23))!,
+                                           latitude: lat, longitude: lon)
+        let makaraEnd = try? XCTUnwrap(day.rashis.first?.endTime)
+        guard let makaraEnd else { return XCTFail("no Moon sign period on 23 Sep 2026") }
+
+        XCTAssertEqual(day.moonRashiNumber, 10, "Makara at sunrise")
+        let parts = ist.dateComponents([.year, .month, .day, .hour, .minute], from: makaraEnd)
+        XCTAssertEqual(parts.day, 23)
+        XCTAssertEqual(parts.month, 9)
+        XCTAssertEqual(parts.hour, 21)
+        XCTAssertEqual(parts.minute, 57)
+    }
+
     /// The nakshatras wholly inside the two signs — the four the old rule had
     /// right — must still read as Panchak, or this fix would have traded one
     /// error for a worse one.
