@@ -97,3 +97,54 @@ final class BhadraKaalTests: XCTestCase {
         }
     }
 }
+
+/// `hasBhadra` on the day summary, which is what the Quick Lookup tile reads.
+extension BhadraKaalTests {
+
+    private func summaries(_ from: (Int, Int), _ to: (Int, Int)) async -> [DailyPanchangSummary] {
+        let start = ist.date(from: DateComponents(year: 2026, month: from.0, day: from.1))!
+        let end   = ist.date(from: DateComponents(year: 2026, month: to.0, day: to.1))!
+        return await repo.fetchDailyPanchangSummaries(from: start, to: end,
+                                                      latitude: lat, longitude: lon)
+    }
+
+    /// The summary flag and the day's own window have to name the same days, or
+    /// the tile and the advisory would disagree about when Bhadra is.
+    func testTheSummaryFlagAgreesWithTheDaysOwnWindow() async {
+        for day in 1...20 {
+            let date = ist.date(from: DateComponents(year: 2026, month: 9, day: day))!
+            let full = await repo.fetchPanchang(for: date, latitude: lat, longitude: lon)
+            let rows = await summaries((9, day), (9, day))
+            guard let summary = rows.first else { return XCTFail("no summary for \(day)") }
+            XCTAssertEqual(summary.hasBhadra, full.bhadraKaal != nil,
+                           "September \(day): flag \(summary.hasBhadra), window \(full.bhadraKaal != nil)")
+        }
+    }
+
+    /// A karana runs ten to thirteen hours against a twenty-four hour day, so
+    /// about half of all Bhadras cover neither sunrise. Reading the sunrise
+    /// karana alone would miss those, which is why the flag brackets the day.
+    func testABhadraCoveringNeitherSunriseIsStillFound() async {
+        let rows = await summaries((9, 1), (9, 30))
+        let flagged = rows.filter(\.hasBhadra).count
+        // Bhadra falls on roughly 8 of every 30 tithis, so a month with almost
+        // none would mean the bracket had collapsed to a point.
+        XCTAssertGreaterThan(flagged, 5, "September 2026 flagged only \(flagged) days")
+    }
+
+    /// The bracket walks forward through the karana cycle, so it has to survive
+    /// the wrap from 60 back to 1.
+    func testTheBracketWrapsAroundTheEndOfTheCycle() {
+        XCTAssertTrue(PanchaangHelper.isVishti(between: 58, and: 10),
+                      "karana 8 lies between them once the cycle wraps past 60")
+        XCTAssertFalse(PanchaangHelper.isVishti(between: 58, and: 3),
+                       "the wrap is walked, and nothing Vishti is in it")
+    }
+
+    func testVishtiIsEverySeventhMovableKarana() {
+        XCTAssertTrue(PanchaangHelper.isVishti(karanaNumber: 8))
+        XCTAssertTrue(PanchaangHelper.isVishti(karanaNumber: 15))
+        XCTAssertFalse(PanchaangHelper.isVishti(karanaNumber: 1), "Kimstughna, a fixed karana")
+        XCTAssertFalse(PanchaangHelper.isVishti(karanaNumber: 58), "Shakuni, a fixed karana")
+    }
+}

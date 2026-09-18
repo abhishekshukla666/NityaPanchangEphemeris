@@ -169,6 +169,13 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 && isSankashtiDay(date: current, sunriseTithi: sunriseTithiNumber,
                                   latitude: latitude, longitude: longitude)
 
+            // Two readings, not a scan: the karana at this sunrise and at the
+            // next bound every karana the day touches — see isVishti(between:and:).
+            let jdNextSunrise = jdSunrise + 1.0
+            let hasBhadra = PanchaangHelper.isVishti(
+                between: Int(wrapper.calculateKarana(forJulianDay: jdSunrise)),
+                and: Int(wrapper.calculateKarana(forJulianDay: jdNextSunrise)))
+
             results.append(DailyPanchangSummary(
                 date:            current,
                 tithiNumber:     sunriseTithiNumber,
@@ -178,7 +185,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 lunarMonth:      Int(wrapper.calculatePurnimantaMonth(forJulianDay: jdSunrise)),
                 isAdhikMaas:     wrapper.calculateIsAdhikMaas(forJulianDay: jdSunrise),
                 isPradoshVrat:   isPradoshVratDay,
-                isSankashtiChaturthi: isSankashti
+                isSankashtiChaturthi: isSankashti,
+                hasBhadra:       hasBhadra
             ))
 
             current = cal.date(byAdding: .day, value: 1, to: current) ?? end.addingTimeInterval(1)

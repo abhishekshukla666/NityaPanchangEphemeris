@@ -39,9 +39,17 @@ public struct DailyPanchangSummary: Sendable {
     /// day from the one Chaturthi reaches at sunrise.
     public let isSankashtiChaturthi: Bool
 
+    /// Whether a Vishti (Bhadra) karana touches this panchang day.
+    ///
+    /// Read from the karanas at this sunrise and the next rather than from the
+    /// sunrise karana alone: a karana runs ten to thirteen hours against a
+    /// twenty-four hour day, so about half of all Bhadras cover neither sunrise
+    /// and a sunrise reading would miss them.
+    public let hasBhadra: Bool
+
     public init(date: Date, tithiNumber: Int, nakshatraName: String, moonRashiNumber: Int,
                 vara: String, lunarMonth: Int, isAdhikMaas: Bool, isPradoshVrat: Bool = false,
-                isSankashtiChaturthi: Bool = false) {
+                isSankashtiChaturthi: Bool = false, hasBhadra: Bool = false) {
         self.date = date
         self.tithiNumber = tithiNumber
         self.nakshatraName = nakshatraName
@@ -51,5 +59,6 @@ public struct DailyPanchangSummary: Sendable {
         self.isAdhikMaas = isAdhikMaas
         self.isPradoshVrat = isPradoshVrat
         self.isSankashtiChaturthi = isSankashtiChaturthi
+        self.hasBhadra = hasBhadra
     }
 }
