@@ -44,6 +44,35 @@ public protocol PanchaangRepository: Sendable {
     /// as a whole panchang day, and needs no location at all — a sign change is
     /// the same instant everywhere.
     func fetchRashiChanges(from date: Date) async -> [RashiChange]
+
+    /// Where the grahas are at one instant, rather than at a day's sunrise.
+    ///
+    /// `PanchangDay` reads every position at sunrise, because every panchang
+    /// limb is read there — the tithi, the nakshatra and the yoga are the
+    /// *day's*, and a panchang day begins at sunrise. That is right for the
+    /// limbs and wrong for a card that says where the planets ARE: Mars
+    /// entered Karka at 16:35 on 18 September 2026 and a sunrise reading went
+    /// on saying Mithun until the following dawn, a quarter of a degree short
+    /// of the boundary it had already crossed.
+    ///
+    /// Needs no location. A graha's longitude is the same from everywhere; only
+    /// the rising sign and the day's limbs depend on where you stand.
+    func fetchPlanetPositions(at date: Date) async -> PlanetSnapshot
+}
+
+/// The twelve bodies at a moment, split the way `PanchangDay` splits them.
+///
+/// Uranus, Neptune and Pluto stay apart from the nine for the reason they
+/// always do: no classical rule has a place for them, and code that reasons
+/// about the Navagraha must not pick them up by accident.
+public struct PlanetSnapshot: Sendable {
+    public let navagraha: [PlanetPosition]
+    public let outer: [PlanetPosition]
+
+    public init(navagraha: [PlanetPosition], outer: [PlanetPosition]) {
+        self.navagraha = navagraha
+        self.outer = outer
+    }
 }
 
 public extension PanchaangRepository {
@@ -57,4 +86,10 @@ public extension PanchaangRepository {
 
     /// Same no-op, for the same reason.
     func fetchRashiChanges(from date: Date) async -> [RashiChange] { [] }
+
+    /// Same no-op again. A caller that gets nothing back falls through to the
+    /// sunrise positions on `PanchangDay`, which is what it had before.
+    func fetchPlanetPositions(at date: Date) async -> PlanetSnapshot {
+        PlanetSnapshot(navagraha: [], outer: [])
+    }
 }

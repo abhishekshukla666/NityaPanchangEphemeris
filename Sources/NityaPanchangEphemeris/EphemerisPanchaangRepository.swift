@@ -111,6 +111,23 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         }
     }
 
+    /// The grahas at one instant — see the protocol for why this is not simply
+    /// `fetchPanchang(...).planetPositions`.
+    public func fetchPlanetPositions(at date: Date) async -> PlanetSnapshot {
+        await withCheckedContinuation { continuation in
+            queue.async { [self] in
+                let jd = wrapper.getJulianDayUTC(from: date)
+                let raw = wrapper.calculatePlanetPositions(forJulianDay: jd)
+                let rawOuter = wrapper.calculateOuterPlanetPositions(forJulianDay: jd)
+                continuation.resume(returning: PlanetSnapshot(
+                    navagraha: PanchaangHelper.buildPlanetPositions(
+                        from: raw as? [[String: Any]] ?? []),
+                    outer: PanchaangHelper.buildPlanetPositions(
+                        from: rawOuter as? [[String: Any]] ?? [])))
+            }
+        }
+    }
+
     // MARK: - Private computation (always called from `queue`)
 
     /// The twelve bodies' next sign changes, in planet order — the nine, then
