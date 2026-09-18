@@ -307,6 +307,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         let lagnas = computeLagnas(sunriseJD: sunriseJD, sunsetJD: sunsetJD, nextSunriseJD: nextSunriseJD,
                                    latitude: latitude, longitude: longitude)
         let bhadraKaal = computeBhadraKaal(sunriseJD: sunriseJD, nextSunriseJD: nextSunriseJD)
+        let panchakKaal = computePanchakKaal(sunriseJD: sunriseJD, nextSunriseJD: nextSunriseJD)
+        let gandaMoolaKaal = computeGandaMoolaKaal(sunriseJD: sunriseJD, nextSunriseJD: nextSunriseJD)
 
         // The day's limbs as periods, so a caller can show what is running now
         // beside the Udaya reading that names the day.
@@ -378,6 +380,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             horas:             horas,
             lagnas:            lagnas,
             bhadraKaal:        bhadraKaal,
+            panchakKaal:       panchakKaal,
+            gandaMoolaKaal:    gandaMoolaKaal,
             amantaMonth:       amantaMonthName,
             isPradoshVrat:     isPradoshVratDay,
             nakshatras:        nakshatraPeriods,
@@ -424,8 +428,14 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
 
     /// start rather than clipped — a warning needs an accurate start time to
     /// be useful, not just "some time before now."
+    ///
+    /// Reported whole, never trimmed to the panchang day it was found in. The
+    /// end used to be clipped to the next sunrise, so a Bhadra running from
+    /// 04:26 to 15:27 on 3 September was announced on the 2nd's card as ending
+    /// at 06:09 — which is the 3rd's sunrise, not the end of anything. Telling
+    /// a reader that the period they must not start work in is over when it has
+    /// eight hours left is the one mistake this row must not make.
     private func computeBhadraKaal(sunriseJD: Double, nextSunriseJD: Double) -> Muhurat? {
-        let step: Double = 15.0 / 1440.0
         var searchJD = sunriseJD
 
         while searchJD < nextSunriseJD {
@@ -436,17 +446,111 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             let isVishti = karanaNum >= 2 && karanaNum <= 57 && (karanaNum - 2) % 7 == 6
 
             if isVishti {
-                var startJD = searchJD
-                while startJD - step >= sunriseJD - 0.833,
-                      Int(wrapper.calculateKarana(forJulianDay: startJD - step)) == karanaNum {
-                    startJD -= step
-                }
+                // The true boundary, by the same bisection the end uses. The old
+                // fifteen-minute backward walk stopped on a grid anchored to the
+                // sunrise the scan began at, so consecutive days reported starts
+                // thirteen minutes apart for one Bhadra.
+                let startJD = wrapper.calculateKaranaStartTime(forJulianDay: searchJD)
                 return Muhurat(name: "Bhadra Kaal", startTime: jdToDate(startJD),
-                               endTime: jdToDate(min(endJD, nextSunriseJD)), type: .inauspicious)
+                               endTime: jdToDate(endJD), type: .inauspicious)
             }
             searchJD = endJD
         }
         return nil
+    }
+
+    /// The Ganda Moola window touching this panchang day, if any.
+    ///
+    /// The same treatment Panchak gets, for the same reason: this is the Moon
+    /// in one of six nakshatras, which is a period, and reading the nakshatra
+    /// AT SUNRISE says nothing on a day where one of them begins in the
+    /// evening. The row was silent on exactly those days.
+    ///
+    /// Consecutive Ganda Moola nakshatras are merged into one window. Three
+    /// pairs are adjacent — Ashlesha into Magha, Jyeshtha into Mula, and Revati
+    /// into Ashwini across the wrap — and a reader in the middle of that stretch
+    /// is in one continuous caution, not two that happen to touch. Never more
+    /// than two in a row, because no third Ganda Moola nakshatra follows any
+    /// pair.
+    private func computeGandaMoolaKaal(sunriseJD: Double, nextSunriseJD: Double) -> Muhurat? {
+        func isGandaMoola(_ jd: Double) -> Bool {
+            let n = Int(wrapper.calculateNakshatra(forJulianDay: jd))
+            return PanchaangHelper.isGandaMoola(nakshatraName: PanchaangHelper.getNakshatraName(n))
+        }
+
+        var insideJD: Double
+        if isGandaMoola(sunriseJD) {
+            insideJD = sunriseJD
+        } else {
+            // Up to two more nakshatras can begin before the next sunrise.
+            var probeJD = wrapper.calculateNakshatraEndTime(forJulianDay: sunriseJD)
+            var found: Double?
+            for _ in 0..<2 where found == nil {
+                guard probeJD < nextSunriseJD else { break }
+                if isGandaMoola(probeJD) { found = probeJD; break }
+                probeJD = wrapper.calculateNakshatraEndTime(forJulianDay: probeJD)
+            }
+            guard let found else { return nil }
+            insideJD = found
+        }
+
+        var startJD = wrapper.calculateNakshatraStartTime(forJulianDay: insideJD)
+        if isGandaMoola(startJD - 0.001) {
+            startJD = wrapper.calculateNakshatraStartTime(forJulianDay: startJD - 0.001)
+        }
+        var endJD = wrapper.calculateNakshatraEndTime(forJulianDay: insideJD)
+        if isGandaMoola(endJD + 0.001) {
+            endJD = wrapper.calculateNakshatraEndTime(forJulianDay: endJD + 0.001)
+        }
+
+        return Muhurat(name: "Ganda Moola", startTime: jdToDate(startJD),
+                       endTime: jdToDate(endJD), type: .inauspicious)
+    }
+
+    /// The Panchak window touching this panchang day, if any.
+    ///
+    /// A period, not a day flag, for the reason the Bhadra row above is one:
+    /// Panchak is the Moon's passage through Kumbha and Meena, and it begins
+    /// when the Moon crosses 300° — 21:57 on 23 September 2026, long after that
+    /// day's sunrise. Asking "which sign is the Moon in at sunrise" answers no
+    /// on the 23rd and leaves the advisory silent through an evening that is
+    /// already Panchak. The Quick Lookup card, which reasons about the period,
+    /// said the 23rd all along; the two disagreed on screen.
+    ///
+    /// Reported whole — the Moon's entry into Kumbha to its exit from Meena,
+    /// about four and a half days — so every day it touches can show the same
+    /// start and end rather than its own slice of it.
+    private func computePanchakKaal(sunriseJD: Double, nextSunriseJD: Double) -> Muhurat? {
+        func isPanchak(_ jd: Double) -> Bool {
+            PanchaangHelper.isPanchak(moonRashiNumber: Int(wrapper.calculateMoonRashi(forJulianDay: jd)))
+        }
+
+        // Either the day opens inside Panchak, or the Moon enters Kumbha before
+        // the next sunrise. Those are the only two ways it can touch this day,
+        // because the Moon takes over two days to cross one sign and cannot
+        // enter and leave within a single day.
+        var insideJD: Double
+        if isPanchak(sunriseJD) {
+            insideJD = sunriseJD
+        } else {
+            let nextSignJD = wrapper.calculateMoonRashiEndTime(forJulianDay: sunriseJD)
+            guard nextSignJD < nextSunriseJD, isPanchak(nextSignJD) else { return nil }
+            insideJD = nextSignJD
+        }
+
+        // Back to the entry into Kumbha, then forward to the exit from Meena.
+        // At most two hops each way, since the window is exactly two signs.
+        var startJD = wrapper.calculateMoonRashiStartTime(forJulianDay: insideJD)
+        if isPanchak(startJD - 0.001) {
+            startJD = wrapper.calculateMoonRashiStartTime(forJulianDay: startJD - 0.001)
+        }
+        var endJD = wrapper.calculateMoonRashiEndTime(forJulianDay: insideJD)
+        if isPanchak(endJD + 0.001) {
+            endJD = wrapper.calculateMoonRashiEndTime(forJulianDay: endJD + 0.001)
+        }
+
+        return Muhurat(name: "Panchak", startTime: jdToDate(startJD),
+                       endTime: jdToDate(endJD), type: .inauspicious)
     }
 
     // MARK: - Birth Chart (Guna Milan) — Moon nakshatra/pada/rashi + Mars + Lagna

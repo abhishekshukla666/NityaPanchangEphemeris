@@ -455,6 +455,25 @@ static double NPRefineCrossing(double lastHolding, double firstNotHolding,
                             ^int(double jd) { return [self calculateNakshatraForJulianDay:jd]; });
 }
 
+// The same search run backwards, for when a nakshatra BEGAN.
+//
+// Ganda Moola is the Moon in one of six nakshatras, so it is a period like the
+// others on the advisory card, and its start is a crossing rather than the
+// sunrise of whichever day first noticed it.
+- (double)calculateNakshatraStartTimeForJulianDay:(double)startJD {
+    int startingNakshatra = [self calculateNakshatraForJulianDay:startJD];
+    double step = 15.0 / (24.0 * 60.0);
+    double searchJD = startJD;
+    int searchNakshatra = startingNakshatra;
+    while (searchNakshatra == startingNakshatra) {
+        searchJD -= step;
+        searchNakshatra = [self calculateNakshatraForJulianDay:searchJD];
+        if (searchJD < startJD - 1.5) { return searchJD; }
+    }
+    return NPRefineCrossing(searchJD + step, searchJD, startingNakshatra,
+                            ^int(double jd) { return [self calculateNakshatraForJulianDay:jd]; });
+}
+
 - (double)calculateMoonRashiEndTimeForJulianDay:(double)startJD {
     int startingRashi = [self calculateMoonRashiForJulianDay:startJD];
     double step = 15.0 / (24.0 * 60.0);
@@ -466,6 +485,28 @@ static double NPRefineCrossing(double lastHolding, double firstNotHolding,
         if (searchJD > startJD + 3.0) { return searchJD; }
     }
     return NPRefineCrossing(searchJD - step, searchJD, startingRashi,
+                            ^int(double jd) { return [self calculateMoonRashiForJulianDay:jd]; });
+}
+
+// The same search run backwards, for when the Moon's current sign BEGAN.
+//
+// Panchak is the Moon's passage through Kumbha and Meena, so its start is the
+// instant the Moon entered Kumbha — which is usually before the sunrise of the
+// day that first reports it. A period cannot be stated from a day flag.
+//
+// Three days of cap, matching the forward search: the Moon crosses a sign in
+// about two and a quarter.
+- (double)calculateMoonRashiStartTimeForJulianDay:(double)startJD {
+    int startingRashi = [self calculateMoonRashiForJulianDay:startJD];
+    double step = 15.0 / (24.0 * 60.0);
+    double searchJD = startJD;
+    int searchRashi = startingRashi;
+    while (searchRashi == startingRashi) {
+        searchJD -= step;
+        searchRashi = [self calculateMoonRashiForJulianDay:searchJD];
+        if (searchJD < startJD - 3.0) { return searchJD; }
+    }
+    return NPRefineCrossing(searchJD + step, searchJD, startingRashi,
                             ^int(double jd) { return [self calculateMoonRashiForJulianDay:jd]; });
 }
 
@@ -510,6 +551,37 @@ static double NPRefineCrossing(double lastHolding, double firstNotHolding,
         if (searchJD > startJD + 0.833) { return searchJD; }
     }
     return NPRefineCrossing(searchJD - step, searchJD, startingKarana,
+                            ^int(double jd) { return [self calculateKaranaForJulianDay:jd]; });
+}
+
+// The same search run backwards, for when a karana BEGAN.
+//
+// Bhadra used to find its start by stepping back in fifteen-minute hops and
+// stopping on the last grid point still inside the karana, which is accurate
+// only to a quarter of an hour — and worse, the grid is anchored to whichever
+// sunrise the scan started from, so two consecutive days reported starts
+// thirteen minutes apart for the SAME Bhadra. A warning whose start time moves
+// depending on which day you read it from is not a warning anyone can plan
+// around.
+//
+// The bracket is passed the same way round as the forward case — the holding
+// side first — so the refiner's own invariant is unchanged; only the direction
+// of the walk differs. What comes back is the crossing to within a
+// millisecond, which is closer than any displayed time can show.
+- (double)calculateKaranaStartTimeForJulianDay:(double)startJD {
+    int startingKarana = [self calculateKaranaForJulianDay:startJD];
+    double step = 15.0 / (24.0 * 60.0);
+    double searchJD = startJD;
+    int searchKarana = startingKarana;
+    while (searchKarana == startingKarana) {
+        searchJD -= step;
+        searchKarana = [self calculateKaranaForJulianDay:searchJD];
+        // A karana runs 10-13 hours; 0.833 of a day is the same cap the forward
+        // search uses, and reaching it means something is wrong rather than
+        // that the karana is unusually long.
+        if (searchJD < startJD - 0.833) { return searchJD; }
+    }
+    return NPRefineCrossing(searchJD + step, searchJD, startingKarana,
                             ^int(double jd) { return [self calculateKaranaForJulianDay:jd]; });
 }
 

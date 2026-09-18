@@ -65,6 +65,10 @@ typedef struct {
 - (int)calculateYogaForJulianDay:(double)jd;
 - (int)calculateNakshatraForJulianDay:(double)jd;
 - (double)calculateNakshatraEndTimeForJulianDay:(double)startJD;
+/// When the nakshatra holding at `startJD` began. The mirror of the end search
+/// above, so Ganda Moola can state its start rather than the sunrise it was
+/// first noticed at.
+- (double)calculateNakshatraStartTimeForJulianDay:(double)startJD;
 
 - (NSDictionary *)calculateMuhuratsWithSunrise:(double)sunriseJD sunset:(double)sunsetJD weekday:(int)weekday;
 - (double)calculateYogaEndTimeForJulianDay:(double)startJD;
@@ -78,9 +82,16 @@ typedef struct {
 /// roughly two and a quarter days. A day-and-a-half window would miss the
 /// crossing outright and report the end of the search instead.
 - (double)calculateMoonRashiEndTimeForJulianDay:(double)startJD;
+/// When the Moon's current sign began. The mirror of the end search above, and
+/// what lets Panchak state the moment the Moon entered Kumbha rather than the
+/// sunrise it was first noticed at.
+- (double)calculateMoonRashiStartTimeForJulianDay:(double)startJD;
 
 - (int)calculateKaranaForJulianDay:(double)jd;
 - (double)calculateKaranaEndTimeForJulianDay:(double)startJD;
+/// When the karana holding at `startJD` began. The mirror of the end search
+/// above, and the only way to state a Bhadra's start without rounding it.
+- (double)calculateKaranaStartTimeForJulianDay:(double)startJD;
 
 /// Returns an array of 9 NSDictionary objects (one per Navagraha).
 /// Each dict has: planetIndex (0–8), longitude (0–360), rashiNumber (1–12), degreesInSign (0–30).

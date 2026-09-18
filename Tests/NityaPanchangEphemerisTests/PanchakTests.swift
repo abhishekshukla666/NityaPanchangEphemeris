@@ -126,6 +126,63 @@ final class PanchakTests: XCTestCase {
         XCTAssertEqual(parts.minute, 57)
     }
 
+    // MARK: - The window, not the day flag
+
+    private func panchakWindow(_ y: Int, _ m: Int, _ d: Int) async -> Muhurat? {
+        let date = ist.date(from: DateComponents(year: y, month: m, day: d))!
+        return await repo.fetchPanchang(for: date, latitude: lat, longitude: lon).panchakKaal
+    }
+
+    /// The day the advisory used to stay silent on.
+    ///
+    /// Panchak opens at 21:57 on 23 September, so the Moon is still in Makara at
+    /// that morning's sunrise. A rule that asks which sign the Moon is in AT
+    /// SUNRISE answers no, and the dashboard's advisory said nothing through an
+    /// evening that was already Panchak — while the Quick Lookup card, which
+    /// reasons about the period, had the 23rd right all along.
+    func testTheDayPanchakOpensReportsItEvenThoughSunriseDoesNot() async throws {
+        let date = ist.date(from: DateComponents(year: 2026, month: 9, day: 23))!
+        let day = await repo.fetchPanchang(for: date, latitude: lat, longitude: lon)
+
+        XCTAssertEqual(day.moonRashiNumber, 10, "Makara at sunrise — the old rule's answer")
+        let window = try XCTUnwrap(day.panchakKaal, "and yet the day holds Panchak")
+        let start = ist.dateComponents([.day, .hour, .minute], from: window.startTime)
+        XCTAssertEqual([start.day, start.hour, start.minute], [23, 21, 57])
+    }
+
+    /// Every day it touches reports the same window, so no two screens can
+    /// describe one Panchak differently.
+    func testEveryDayOfOnePanchakReportsTheSameWindow() async throws {
+        let found = await panchakWindow(2026, 9, 23)
+        let first = try XCTUnwrap(found)
+        for day in 24...28 {
+            let onDay = await panchakWindow(2026, 9, day)
+            let window = try XCTUnwrap(onDay, "September \(day)")
+            XCTAssertEqual(window.startTime.timeIntervalSince(first.startTime), 0, accuracy: 1,
+                           "September \(day)")
+            XCTAssertEqual(window.endTime.timeIntervalSince(first.endTime), 0, accuracy: 1,
+                           "September \(day)")
+        }
+    }
+
+    /// And the days either side report none. The 29th is the one worth naming:
+    /// its panchang day begins after Panchak ended at 10:16 on the 28th.
+    func testTheDaysEitherSideReportNothing() async {
+        let before = await panchakWindow(2026, 9, 22)
+        let after = await panchakWindow(2026, 9, 29)
+        XCTAssertNil(before)
+        XCTAssertNil(after)
+    }
+
+    /// The window is the two signs exactly — 60° of Moon travel, four and a half
+    /// days — rather than a slice of one day.
+    func testTheWindowIsTheWholeOfBothSigns() async throws {
+        let found = await panchakWindow(2026, 9, 25)
+        let window = try XCTUnwrap(found)
+        let days = window.endTime.timeIntervalSince(window.startTime) / 86_400
+        XCTAssertEqual(days, 4.5, accuracy: 0.4)
+    }
+
     /// The nakshatras wholly inside the two signs — the four the old rule had
     /// right — must still read as Panchak, or this fix would have traded one
     /// error for a worse one.

@@ -273,6 +273,16 @@ public struct PanchangDay: Sendable {
     /// nil most days (Bhadra occurs on roughly 8 of every 30 tithis). Defaults
     /// to nil so existing callers (previews, tests) don't need updating.
     public let bhadraKaal: Muhurat?
+    /// The Panchak window touching this day — the Moon's passage through Kumbha
+    /// and Meena — or nil on the days it does not.
+    ///
+    /// A window rather than a flag because Panchak begins at an instant, not at
+    /// a sunrise. Defaulted to nil so existing callers, previews and tests are
+    /// unaffected.
+    public let panchakKaal: Muhurat?
+    /// The Ganda Moola window touching this day — the Moon in one of the six
+    /// nakshatras, with adjacent ones merged — or nil on the days it does not.
+    public let gandaMoolaKaal: Muhurat?
 
     /// The Amanta (South Indian) name for this same day — a display-only
     /// parallel to `lunarMonth`. All internal matching (festivals, Ekadashi,
@@ -297,7 +307,9 @@ public struct PanchangDay: Sendable {
                 vara: String, moonRashi: String, moonRashiNumber: Int, muhurats: [Muhurat], chaughariya: [Muhurat],
                 nightChaughariya: [Muhurat], planetPositions: [PlanetPosition],
                 vedaAyana: String, raviYoga: Bool, horas: [HoraInfo], lagnas: [LagnaPeriod],
-                bhadraKaal: Muhurat? = nil, amantaMonth: String = "", isPradoshVrat: Bool = false,
+                bhadraKaal: Muhurat? = nil, panchakKaal: Muhurat? = nil,
+                gandaMoolaKaal: Muhurat? = nil,
+                amantaMonth: String = "", isPradoshVrat: Bool = false,
                 nakshatras: [LimbPeriod] = [], yogas: [LimbPeriod] = [],
                 karanas: [LimbPeriod] = [], rashis: [LimbPeriod] = [],
                 outerPlanets: [PlanetPosition] = []) {
@@ -327,6 +339,8 @@ public struct PanchangDay: Sendable {
         self.horas = horas
         self.lagnas = lagnas
         self.bhadraKaal = bhadraKaal
+        self.panchakKaal = panchakKaal
+        self.gandaMoolaKaal = gandaMoolaKaal
         self.amantaMonth = amantaMonth
         self.isPradoshVrat = isPradoshVrat
         self.nakshatras = nakshatras
