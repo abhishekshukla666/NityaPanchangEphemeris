@@ -773,7 +773,10 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 sunriseTithi: tithi,
                 lostTithi: skipped.first { $0 == 15 || $0 == 30 } ?? skipped.first ?? 0,
                 isPradoshVrat: isPradoshDay(own: overlap[day + 1], previous: overlap[day], next: overlap[day + 2]),
-                isSankashtiChaturthi: isSankashti
+                isSankashtiChaturthi: isSankashti,
+                // On the sunrise already gathered above, so this adds one
+                // wrapper call a day and no new sun calculation.
+                isAdhikMaas: wrapper.calculateIsAdhikMaas(forJulianDay: sunrises[day])
             )
         }
         return results

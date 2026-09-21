@@ -378,12 +378,30 @@ public struct MonthDayTithis: Sendable {
     /// Dated by the tithi at moonrise rather than at sunrise — see
     /// EphemerisPanchaangRepository.isSankashtiDay.
     public let isSankashtiChaturthi: Bool
+    /// Whether this day falls inside an Adhik Maas.
+    ///
+    /// Carried per day rather than as a window because that is the shape the
+    /// calendar consumes — it indexes this dictionary by day-of-month and has
+    /// no other per-day reading to hang a range test on.
+    ///
+    /// An Adhik Maas is a run of 29 or 30 consecutive days, so a caller that
+    /// wants its first or last day finds it by comparing neighbours. The run
+    /// always straddles two Gregorian months: measured over 2023–2031 not one
+    /// of the four windows fits inside a single month, so a caller looking for
+    /// the boundary has to reach past the month's own edges to find it.
+    ///
+    /// Read at sunrise, the same instant as `sunriseTithi`. The Purnimanta and
+    /// Amanta readings of the window agree on every day of all four windows in
+    /// that range, at both Delhi and Bengaluru, so this needs no counterpart
+    /// for the other convention.
+    public let isAdhikMaas: Bool
 
     public init(sunriseTithi: Int, lostTithi: Int = 0, isPradoshVrat: Bool,
-                isSankashtiChaturthi: Bool = false) {
+                isSankashtiChaturthi: Bool = false, isAdhikMaas: Bool = false) {
         self.sunriseTithi = sunriseTithi
         self.lostTithi = lostTithi
         self.isPradoshVrat = isPradoshVrat
         self.isSankashtiChaturthi = isSankashtiChaturthi
+        self.isAdhikMaas = isAdhikMaas
     }
 }
