@@ -774,9 +774,18 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 lostTithi: skipped.first { $0 == 15 || $0 == 30 } ?? skipped.first ?? 0,
                 isPradoshVrat: isPradoshDay(own: overlap[day + 1], previous: overlap[day], next: overlap[day + 2]),
                 isSankashtiChaturthi: isSankashti,
+                // The Purnimanta predicate, because that is the one
+                // PanchangDay.isAdhikMaas carries: the calendar tint and the
+                // day detail sheet a tap opens have to be the same claim. The
+                // two agree on every one of the 21,960 days between 2000 and
+                // 2060, so this is a choice about what the field means rather
+                // than about what it returns — but the Amanta call is right
+                // there under a similar name, and picking it here would leave
+                // the grid quietly following a different rule from the sheet.
+                //
                 // On the sunrise already gathered above, so this adds one
                 // wrapper call a day and no new sun calculation.
-                isAdhikMaas: wrapper.calculateIsAdhikMaas(forJulianDay: sunrises[day])
+                isAdhikMaas: wrapper.calculateIsPurnimantaAdhikMaas(forJulianDay: sunrises[day])
             )
         }
         return results
