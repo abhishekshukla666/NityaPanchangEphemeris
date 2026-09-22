@@ -124,14 +124,41 @@ public struct PanchaangHelper {
 
     // MARK: - Ekadashi Names
 
+    /// The twenty-four Ekadashis, by Purnimanta month.
+    ///
+    /// Whole names rather than a stem plus " Ekadashi". Two of them need a month
+    /// in front — there is a Putrada Ekadashi in Shravana and another in Pausha,
+    /// and a bare "Putrada Ekadashi" cannot tell a reader which one is in front
+    /// of them — so the composition never held anyway.
+    ///
+    /// These are also the only source of the twenty-four Ekadashi festival
+    /// rules; `ekadashiFestivalRules` builds them from here. The two used to be
+    /// written out separately and had drifted apart on five of the twenty-four,
+    /// so the calendar and the Quick Lookup tile named the same day differently:
+    /// Pasankusha against Papankusha, Vaikuntha against Mokshada, a bare Putrada
+    /// against a qualified one twice, and Papmochani against Papamochani.
+    ///
+    /// Index is `lunarMonth - 1`, Chaitra first.
+    public static let shuklaEkadashiNames = [
+        "Kamada Ekadashi", "Mohini Ekadashi", "Nirjala Ekadashi", "Devshayani Ekadashi",
+        "Shravana Putrada Ekadashi", "Parivartini Ekadashi", "Papankusha Ekadashi",
+        "Devutthana Ekadashi", "Mokshada Ekadashi", "Pausha Putrada Ekadashi",
+        "Jaya Ekadashi", "Amalaki Ekadashi",
+    ]
+
+    public static let krishnaEkadashiNames = [
+        "Papamochani Ekadashi", "Varuthini Ekadashi", "Apara Ekadashi", "Yogini Ekadashi",
+        "Kamika Ekadashi", "Aja Ekadashi", "Indira Ekadashi", "Rama Ekadashi",
+        "Utpanna Ekadashi", "Saphala Ekadashi", "Shattila Ekadashi", "Vijaya Ekadashi",
+    ]
+
     public static func getEkadashiName(lunarMonth: Int, paksha: Paksha, isAdhik: Bool = false) -> String {
+        // An Adhik month repeats a month number, so the table above would name
+        // the Ekadashi of the ordinary month of the same number. Both of an
+        // Adhik month's Ekadashis are Padmini.
         if isAdhik { return "Padmini Ekadashi" }
-        let shukla  = ["Kamada", "Mohini", "Nirjala", "Devshayani", "Putrada", "Parsva",
-                       "Pasankusha", "Devutthana", "Mokshada", "Putrada", "Jaya", "Amalaki"]
-        let krishna = ["Papamochani", "Varuthini", "Apara", "Yogini", "Kamika", "Aja",
-                       "Indira", "Rama", "Utpanna", "Saphala", "Shattila", "Vijaya"]
         let idx = (lunarMonth - 1) % 12
-        return (paksha == .shukla ? shukla[idx] : krishna[idx]) + " Ekadashi"
+        return paksha == .shukla ? shuklaEkadashiNames[idx] : krishnaEkadashiNames[idx]
     }
 
     // MARK: - Panchang Alerts

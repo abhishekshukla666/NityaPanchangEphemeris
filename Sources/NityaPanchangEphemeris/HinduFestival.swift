@@ -165,7 +165,32 @@ public struct FestivalRule: Sendable {
 /// the regional one. Kept as a computed join rather than by pasting the
 /// regional days into the main table, so "which of these is regional" stays
 /// answerable by reading one list.
-public let allFestivalRules: [FestivalRule] = panIndianFestivalRules + regionalFestivalRules
+public let allFestivalRules: [FestivalRule] =
+    panIndianFestivalRules + regionalFestivalRules + ekadashiFestivalRules
+
+/// The twenty-four Ekadashis, built from the one table that names them.
+///
+/// They used to be written out here as well as in PanchaangHelper, and the two
+/// copies had drifted on five of the twenty-four — so the calendar named a day
+/// one thing and the Quick Lookup tile, which asks the helper, named it
+/// another. Nothing could catch that: both spellings were real Ekadashi names
+/// and both had translations, so every lint passed while the app contradicted
+/// itself twice a year.
+///
+/// Every one of them was identical but for the name — same emoji, no region,
+/// no observation time of its own — so there was nothing in the hand-written
+/// list worth keeping.
+///
+/// Krishna Ekadashi is tithi 11 and Shukla 26, the app's numbering running
+/// Krishna first from Pratipada to Amavasya at 15.
+public let ekadashiFestivalRules: [FestivalRule] = (1...12).flatMap { month in
+    [
+        FestivalRule(name: PanchaangHelper.getEkadashiName(lunarMonth: month, paksha: .krishna),
+                     emoji: "🛕", lunarMonth: month, tithiNumber: 11),
+        FestivalRule(name: PanchaangHelper.getEkadashiName(lunarMonth: month, paksha: .shukla),
+                     emoji: "🛕", lunarMonth: month, tithiNumber: 26),
+    ]
+}
 
 public let panIndianFestivalRules: [FestivalRule] = [
 
@@ -436,55 +461,6 @@ public let panIndianFestivalRules: [FestivalRule] = [
     // day, and Holi is simply the day after whichever day that lands on.
     // See EphemerisPanchaangRepository.holiFestivals.
 
-    // MARK: - The 24 Ekadashis
-
-    // 1. Chaitra
-    FestivalRule(name: "Papmochani Ekadashi", emoji: "🛕", lunarMonth: 1, tithiNumber: 11),
-    FestivalRule(name: "Kamada Ekadashi",     emoji: "🛕", lunarMonth: 1, tithiNumber: 26),
-
-    // 2. Vaishakha
-    FestivalRule(name: "Varuthini Ekadashi",  emoji: "🛕", lunarMonth: 2, tithiNumber: 11),
-    FestivalRule(name: "Mohini Ekadashi",     emoji: "🛕", lunarMonth: 2, tithiNumber: 26),
-
-    // 3. Jyeshtha
-    FestivalRule(name: "Apara Ekadashi",      emoji: "🛕", lunarMonth: 3, tithiNumber: 11),
-    FestivalRule(name: "Nirjala Ekadashi",    emoji: "🛕", lunarMonth: 3, tithiNumber: 26),
-
-    // 4. Ashadha
-    FestivalRule(name: "Yogini Ekadashi",     emoji: "🛕", lunarMonth: 4, tithiNumber: 11),
-    FestivalRule(name: "Devshayani Ekadashi", emoji: "🛕", lunarMonth: 4, tithiNumber: 26),
-
-    // 5. Shravana
-    FestivalRule(name: "Kamika Ekadashi",     emoji: "🛕", lunarMonth: 5, tithiNumber: 11),
-    FestivalRule(name: "Shravana Putrada Ekadashi", emoji: "🛕", lunarMonth: 5, tithiNumber: 26),
-
-    // 6. Bhadrapada
-    FestivalRule(name: "Aja Ekadashi",        emoji: "🛕", lunarMonth: 6, tithiNumber: 11),
-    FestivalRule(name: "Parsva Ekadashi",emoji: "🛕", lunarMonth: 6, tithiNumber: 26),
-
-    // 7. Ashwina
-    FestivalRule(name: "Indira Ekadashi",     emoji: "🛕", lunarMonth: 7, tithiNumber: 11),
-    FestivalRule(name: "Papankusha Ekadashi", emoji: "🛕", lunarMonth: 7, tithiNumber: 26),
-
-    // 8. Kartika
-    FestivalRule(name: "Rama Ekadashi",       emoji: "🛕", lunarMonth: 8, tithiNumber: 11),
-    FestivalRule(name: "Devutthana Ekadashi", emoji: "🛕", lunarMonth: 8, tithiNumber: 26),
-
-    // 9. Margashirsha
-    FestivalRule(name: "Utpanna Ekadashi",    emoji: "🛕", lunarMonth: 9, tithiNumber: 11),
-    FestivalRule(name: "Mokshada Ekadashi",   emoji: "🛕", lunarMonth: 9, tithiNumber: 26),
-
-    // 10. Pausha
-    FestivalRule(name: "Saphala Ekadashi",    emoji: "🛕", lunarMonth: 10, tithiNumber: 11),
-    FestivalRule(name: "Pausha Putrada Ekadashi", emoji: "🛕", lunarMonth: 10, tithiNumber: 26),
-
-    // 11. Magha
-    FestivalRule(name: "Shattila Ekadashi",   emoji: "🛕", lunarMonth: 11, tithiNumber: 11),
-    FestivalRule(name: "Jaya Ekadashi",       emoji: "🛕", lunarMonth: 11, tithiNumber: 26),
-
-    // 12. Phalguna
-    FestivalRule(name: "Vijaya Ekadashi",     emoji: "🛕", lunarMonth: 12, tithiNumber: 11),
-    FestivalRule(name: "Amalaki Ekadashi",    emoji: "🛕", lunarMonth: 12, tithiNumber: 26),
 ]
 
 // MARK: - Static (Fixed Gregorian Date) Festival Rule
