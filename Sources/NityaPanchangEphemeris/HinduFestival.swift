@@ -165,6 +165,36 @@ public struct FestivalRule: Sendable {
 /// the regional one. Kept as a computed join rather than by pasting the
 /// regional days into the main table, so "which of these is regional" stays
 /// answerable by reading one list.
+/// Which tradition's rule decides the day an Ekadashi vrat is kept on.
+///
+/// The two agree on most of the twenty-four. They part on a day the Ekadashi
+/// tithi is *viddha* — touched by Dashami — which a Vaishnava may not fast on
+/// and a Smarta householder keeps anyway. Measured over 2026–2028 that is
+/// about one day a year.
+///
+/// The split is narrower than it first looks. A *vriddhi* Ekadashi — one whose
+/// tithi holds two consecutive sunrises — moves to its second day under both
+/// traditions, which four published observances confirm: Amalaki 2023, Nirjala
+/// 2024, Rama 2024 and Vijaya 2027. What separates them is the other test:
+///
+///  - **Dashami at arunodaya.** The Ekadashi began inside the last four ghatis
+///    before sunrise — ninety-six minutes — so Dashami was still running at
+///    the hour the vrat's day is reckoned to start. A Vaishnava's fast moves to
+///    the following day; a Smarta householder keeps this one.
+///
+/// Nothing else in the app depends on this. It changes one date, and every
+/// surface that draws a festival follows.
+public enum EkadashiTradition: String, Sendable, CaseIterable {
+    /// The householder rule: the first sunrise the tithi touches, viddha or not.
+    case smarta
+    /// Never on a viddha day; the fast moves to the following one.
+    case vaishnava
+
+    /// Smarta. The householder practice is the commoner one, and it is what a
+    /// printed panchang leads with.
+    public static let `default`: EkadashiTradition = .smarta
+}
+
 public let allFestivalRules: [FestivalRule] =
     panIndianFestivalRules + regionalFestivalRules + ekadashiFestivalRules
 

@@ -18,6 +18,11 @@ public protocol PanchaangRepository: Sendable {
     /// All festivals whose Panchang-derived date falls between startDate and endDate.
     func fetchFestivals(from startDate: Date, to endDate: Date) async -> [HinduFestival]
 
+    /// The same, for a chosen Ekadashi tradition. Only the Ekadashi dates
+    /// differ; every other festival is the same day under either.
+    func fetchFestivals(from startDate: Date, to endDate: Date,
+                        tradition: EkadashiTradition) async -> [HinduFestival]
+
     /// Moon nakshatra/pada/rashi + Mars rashi + Lagna rashi for an arbitrary birth
     /// date+time+location — used for Guna Milan (marriage matching) and Kundli charts.
     func fetchBirthChart(for date: Date, latitude: Double, longitude: Double) async -> BirthChart
@@ -91,5 +96,16 @@ public extension PanchaangRepository {
     /// sunrise positions on `PanchangDay`, which is what it had before.
     func fetchPlanetPositions(at date: Date) async -> PlanetSnapshot {
         PlanetSnapshot(navagraha: [], outer: [])
+    }
+}
+
+public extension PanchaangRepository {
+    /// Conformers written before the tradition existed — test doubles, the
+    /// preview repositories in the calendar and the widget — keep their
+    /// two-argument form and answer with the default tradition. Only the real
+    /// repository overrides this.
+    func fetchFestivals(from startDate: Date, to endDate: Date,
+                        tradition: EkadashiTradition) async -> [HinduFestival] {
+        await fetchFestivals(from: startDate, to: endDate)
     }
 }
