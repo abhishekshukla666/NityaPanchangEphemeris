@@ -1014,6 +1014,37 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                     }
                 }
             }
+            // An Adhik month's Ekadashis, which no rule in the table above can
+            // reach. Every rule matches on a month NUMBER, and an Adhik month
+            // repeats the ordinary month's — so a rule that fired here would
+            // spend the year's Nirjala a month early and leave the real one
+            // unnamed. The `guard !isAdhik` above exists to stop exactly that,
+            // and takes the Ekadashis with it.
+            //
+            // They are not skipped observances, though. Both of an Adhik
+            // month's Ekadashis are kept, and both are Padmini — the one
+            // Ekadashi name that belongs to no month, which is why
+            // getEkadashiName returns it from a branch rather than a table.
+            // Without this the calendar, the festival ribbon and the share
+            // text showed nothing at all for a whole month, roughly once every
+            // thirty-three, while the Quick Lookup tile named them correctly.
+            if isAdhikSunrise, tithiSunrise == 11 || tithiSunrise == 26 {
+                // Vriddhi, as for every other Ekadashi: when the tithi holds
+                // tomorrow's sunrise too, this is the Dashami-viddha side and
+                // the vrat belongs to the second day.
+                let heldTomorrow = cal.date(byAdding: .day, value: 1, to: startOfDay).map {
+                    Int(wrapper.calculateTithiNumber(forJulianDay: referenceSunriseJD(for: $0))) == tithiSunrise
+                } ?? false
+                // Keyed on the tithi as well as the year: an Adhik month has
+                // two Ekadashis, one per paksha, and both are called Padmini.
+                // A name-and-year key would emit the first and swallow the second.
+                let key = "Padmini Ekadashi-\(tithiSunrise)-\(calYear)"
+                if !heldTomorrow, seen.insert(key).inserted {
+                    festivals.append(HinduFestival(name: "Padmini Ekadashi", date: current,
+                                                   emoji: "🛕", hasIcon: false))
+                }
+            }
+
             // Static (fixed Gregorian date) holidays — checked for free inside the existing iteration
             let gregMonth = cal.component(.month, from: startOfDay)
             let gregDay   = cal.component(.day,   from: startOfDay)
