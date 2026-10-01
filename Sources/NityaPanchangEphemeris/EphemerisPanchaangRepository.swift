@@ -45,7 +45,17 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     private var queue: DispatchQueue { Self.queue }
 
     public init() {
-        Self.queue.sync { _ = Self.configureEphePath }
+        // Enqueued, not awaited. This used to be `queue.sync`, which put the configure on the
+        // queue correctly and blocked the CALLER until it got there -- and callers are views.
+        // While the queue is busy the wait is as long as whatever is already on it: a year of
+        // festivals measures near a second on a Mac and several times that on a phone, so a
+        // view being rebuilt during a festival rebuild froze the main thread for all of it.
+        //
+        // `async` keeps the two things that matter. The path is still set ON the queue, so it
+        // cannot race a calculation in flight on another instance; and the queue is serial and
+        // FIFO, so this block is ahead of any work this instance goes on to ask for. The
+        // static-let is still the thing that makes it happen once per process.
+        Self.queue.async { _ = Self.configureEphePath }
     }
 
     // MARK: - PanchaangRepository
