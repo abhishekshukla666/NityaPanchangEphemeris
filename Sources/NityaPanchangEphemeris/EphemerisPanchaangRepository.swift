@@ -144,6 +144,24 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         }
     }
 
+    /// Declination (kranti) for the seven classical grahas at `date`, keyed by
+    /// planet id, north positive.
+    ///
+    /// Separate from `fetchPlanetPositions(at:)` because it costs a second
+    /// ephemeris pass per graha and only Ayana Bala wants it — a birth chart
+    /// asks once, where a panchang day would have paid for it every day.
+    public func fetchDeclinations(at date: Date) async -> [Int: Double] {
+        await withCheckedContinuation { continuation in
+            queue.async { [self] in
+                let jd = wrapper.getJulianDayUTC(from: date)
+                let raw = wrapper.calculateDeclinations(forJulianDay: jd)
+                var result: [Int: Double] = [:]
+                for (key, value) in raw { result[key.intValue] = value.doubleValue }
+                continuation.resume(returning: result)
+            }
+        }
+    }
+
     // MARK: - Private computation (always called from `queue`)
 
     /// The twelve bodies' next sign changes, in planet order — the nine, then

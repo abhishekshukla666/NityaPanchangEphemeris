@@ -107,8 +107,20 @@ public struct PlanetPosition: Identifiable, Sendable {
     /// Moon are never retrograde; Rahu and Ketu always are.
     public let isRetrograde: Bool
 
+    /// Daily motion in longitude, degrees per day, signed. Negative is Vakri —
+    /// `isRetrograde` is this value's sign, kept separately because most callers
+    /// only want the flag.
+    ///
+    /// **Optional on purpose, rather than defaulting to zero.** Zero is a real
+    /// reading: a graha at a station genuinely has no motion, and Cheshta Bala
+    /// gives it a specific strength for that. A fixture built without this field
+    /// would then be indistinguishable from one describing a stationary planet,
+    /// and Shadbala would answer confidently from a number nobody supplied. `nil`
+    /// says "not known", so a calculator that needs it can decline instead.
+    public let speed: Double?
+
     public init(id: Int, name: String, symbol: String, longitude: Double, rashiNumber: Int,
-                degrees: Double, isRetrograde: Bool = false) {
+                degrees: Double, isRetrograde: Bool = false, speed: Double? = nil) {
         self.id = id
         self.name = name
         self.symbol = symbol
@@ -116,6 +128,7 @@ public struct PlanetPosition: Identifiable, Sendable {
         self.rashiNumber = rashiNumber
         self.degrees = degrees
         self.isRetrograde = isRetrograde
+        self.speed = speed
     }
 }
 

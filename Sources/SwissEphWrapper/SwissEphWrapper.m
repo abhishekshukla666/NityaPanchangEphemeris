@@ -612,7 +612,11 @@ static double NPRefineCrossing(double lastHolding, double firstNotHolding,
             @"longitude":    @(lon),
             @"rashiNumber":  @(rashi),
             @"degrees":      @(deg),
-            @"isRetrograde": @(pos[3] < 0)
+            @"isRetrograde": @(pos[3] < 0),
+            // The magnitude as well as the sign. Cheshta Bala is graded on how
+            // fast a graha is moving against its own mean motion, so the number
+            // the retrograde test throws away is the number that reading needs.
+            @"speed":        @(pos[3])
         }];
     }
 
@@ -632,7 +636,8 @@ static double NPRefineCrossing(double lastHolding, double firstNotHolding,
         @"longitude":    @(rahuLon),
         @"rashiNumber":  @(rahuRashi),
         @"degrees":      @(fmod(rahuLon, 30.0)),
-        @"isRetrograde": @(rahuRetrograde)
+        @"isRetrograde": @(rahuRetrograde),
+        @"speed":        @(rahuPos[3])
     }];
 
     // Ketu — South Node = Rahu + 180° (index 8)
@@ -644,9 +649,33 @@ static double NPRefineCrossing(double lastHolding, double firstNotHolding,
         @"longitude":    @(ketuLon),
         @"rashiNumber":  @(ketuRashi),
         @"degrees":      @(fmod(ketuLon, 30.0)),
-        @"isRetrograde": @(rahuRetrograde)
+        @"isRetrograde": @(rahuRetrograde),
+        // Ketu is Rahu's opposite point, so it moves at Rahu's speed, not its
+        // negation: both travel backward together.
+        @"speed":        @(rahuPos[3])
     }];
 
+    return [result copy];
+}
+
+// MARK: - Declination (kranti)
+
+// SEFLG_EQUATORIAL swaps the returned frame: pos[0] becomes right ascension and
+// pos[1] the declination, in place of longitude and latitude. NOT combined with
+// SEFLG_SIDEREAL -- declination is measured from the celestial equator, which the
+// ayanamsa does not move, and asking for both is a contradiction rather than a
+// refinement.
+- (NSDictionary<NSNumber *, NSNumber *> *)calculateDeclinationsForJulianDay:(double)jd {
+    long flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL;
+    char errorMessage[256];
+    NSMutableDictionary *result = [NSMutableDictionary dictionaryWithCapacity:7];
+
+    int seIds[7] = { SE_SUN, SE_MOON, SE_MARS, SE_MERCURY, SE_JUPITER, SE_VENUS, SE_SATURN };
+    for (int i = 0; i < 7; i++) {
+        double pos[6];
+        if (swe_calc_ut(jd, seIds[i], flags, pos, errorMessage) < 0) continue;
+        result[@(i)] = @(pos[1]);
+    }
     return [result copy];
 }
 
@@ -677,7 +706,8 @@ static double NPRefineCrossing(double lastHolding, double firstNotHolding,
             @"degrees":      @(fmod(lon, 30.0)),
             // All three are retrograde for roughly five months of every year,
             // which is most of what there is to say about their motion.
-            @"isRetrograde": @(pos[3] < 0)
+            @"isRetrograde": @(pos[3] < 0),
+            @"speed":        @(pos[3])
         }];
     }
     return [result copy];

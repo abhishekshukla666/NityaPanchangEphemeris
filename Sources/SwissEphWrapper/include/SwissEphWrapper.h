@@ -104,6 +104,21 @@ typedef struct {
 /// reasons about the nine, and no classical rule has a place for these three.
 - (NSArray<NSDictionary *> *)calculateOuterPlanetPositionsForJulianDay:(double)jd;
 
+/// Declination (kranti) in degrees for the seven classical grahas, keyed by the
+/// same planet indices 0-6. North is positive.
+///
+/// Its own call rather than a field on the position dictionary, for the reason
+/// the outer planets have their own: that dictionary is built for every panchang
+/// day, and this needs a second ephemeris pass per graha. Only Ayana Bala wants
+/// it, and that is computed once for a birth chart.
+///
+/// Read from the ephemeris with SEFLG_EQUATORIAL rather than derived from the
+/// longitude already in hand. The textbook route -- sin(decl) = sin(obliquity) x
+/// sin(tropical longitude) -- assumes the body sits exactly on the ecliptic, and
+/// the Moon can be five degrees off it. It would also need the ayanamsa added
+/// back to undo the sidereal correction, which is an extra place to be wrong.
+- (NSDictionary<NSNumber *, NSNumber *> *)calculateDeclinationsForJulianDay:(double)jd;
+
 /// The graha's sidereal longitude (0–360) at `jd`, by the same planet indices
 /// `calculatePlanetPositionsForJulianDay:` uses — 0 Sun, 1 Moon, 2 Mars,
 /// 3 Mercury, 4 Jupiter, 5 Venus, 6 Saturn, 7 Rahu, 8 Ketu. Returns -1 for an

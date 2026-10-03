@@ -117,7 +117,10 @@ public struct PanchaangHelper {
             let info = planetNames[idx]
             return PlanetPosition(id: idx, name: info.name, symbol: info.symbol,
                                   longitude: lon, rashiNumber: rashi, degrees: deg,
-                                  isRetrograde: dict["isRetrograde"] as? Bool ?? false)
+                                  isRetrograde: dict["isRetrograde"] as? Bool ?? false,
+                                  // Stays nil if the wrapper did not supply it, rather
+                                  // than falling to zero -- see PlanetPosition.speed.
+                                  speed: dict["speed"] as? Double)
         }
         .sorted { $0.id < $1.id }
     }
