@@ -414,6 +414,9 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             isAdhikMaas:       isAdhik,
             sunrise:           jdToDate(sunriseJD),
             sunset:            jdToDate(sunsetJD),
+            // Computed well above for the night segments, the lagnas and the
+            // three kaals; it simply never left this function before.
+            nextSunrise:       jdToDate(nextSunriseJD),
             moonrise:          moonrise,
             moonset:           moonset,
             tithi:             Tithi(name: PanchaangHelper.getTithiName(tithiNum),

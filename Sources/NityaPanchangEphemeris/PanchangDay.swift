@@ -222,6 +222,19 @@ public struct PanchangDay: Sendable {
     public let isAdhikMaas: Bool            // true during a leap/extra lunar month
     public let sunrise: Date
     public let sunset: Date
+    /// The following day's sunrise — the end of THIS panchang day.
+    ///
+    /// A Vedic day runs sunrise to sunrise, so this is the boundary every limb
+    /// in the arrays below is scoped by, and the only way a caller can clip a
+    /// period to the day it belongs to. The limb arrays are bounded by it at the
+    /// START but not at the end: a nakshatra beginning at 02:19 is listed on this
+    /// day and carries its own natural end, which may be well past tomorrow's
+    /// dawn. Anything reporting a window has to intersect against this.
+    ///
+    /// Optional only so that fixtures built before it existed keep compiling.
+    /// The ephemeris always fills it; it was computed here all along and simply
+    /// never surfaced.
+    public let nextSunrise: Date?
     public let moonrise: Date?              // nil if Moon doesn't rise that day
     public let moonset: Date?               // nil if Moon doesn't set that day
 
@@ -315,7 +328,8 @@ public struct PanchangDay: Sendable {
     public let isPradoshVrat: Bool
 
     public init(date: Date, lunarMonth: String, lunarMonthNumber: Int, isAdhikMaas: Bool,
-                sunrise: Date, sunset: Date, moonrise: Date?, moonset: Date?,
+                sunrise: Date, sunset: Date, nextSunrise: Date? = nil,
+                moonrise: Date?, moonset: Date?,
                 tithi: Tithi, tithiNumber: Int, nakshatra: Nakshatra, yoga: MinorLimb, karana: MinorLimb,
                 vara: String, moonRashi: String, moonRashiNumber: Int, muhurats: [Muhurat], chaughariya: [Muhurat],
                 nightChaughariya: [Muhurat], planetPositions: [PlanetPosition],
@@ -332,6 +346,7 @@ public struct PanchangDay: Sendable {
         self.isAdhikMaas = isAdhikMaas
         self.sunrise = sunrise
         self.sunset = sunset
+        self.nextSunrise = nextSunrise
         self.moonrise = moonrise
         self.moonset = moonset
         self.tithi = tithi
