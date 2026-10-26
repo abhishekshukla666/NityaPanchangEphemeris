@@ -53,6 +53,18 @@ protocol PanchaangRepository: Sendable {
 }
 ```
 
+For a food or wellness app, one call gives the season and the sacred calendar for a day: the
+Ritu (shifted six months south of the equator), the month in the reader's Amanta or
+Purnimanta system, whether it is Chaturmas, whether it is an Ekadashi or Navratri, and
+whether the Ritu is turning (Ritu Sandhi). Its dates are the festival list's own.
+
+```swift
+let day = await repository.fetchSeasonalDay(for: Date(), latitude: lat, longitude: lon,
+                                            system: .amanta, tradition: .smarta)
+// SeasonalDay(ritu: .sharad, lunarMonth: 7, isAdhikMaas: false, isChaturmas: true,
+//             vrat: nil, isRituSandhi: false)
+```
+
 ## What's inside
 
 | Layer | Contents |

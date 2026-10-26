@@ -237,7 +237,9 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 isAdhikMaas:     wrapper.calculateIsAdhikMaas(forJulianDay: jdSunrise),
                 isPradoshVrat:   isPradoshVratDay,
                 isSankashtiChaturthi: isSankashti,
-                hasBhadra:       hasBhadra
+                hasBhadra:       hasBhadra,
+                amantaMonth:     Int(wrapper.calculateAmantaMonth(forJulianDay: jdSunrise)),
+                isPurnimantaAdhikMaas: wrapper.calculateIsPurnimantaAdhikMaas(forJulianDay: jdSunrise)
             ))
 
             current = cal.date(byAdding: .day, value: 1, to: current) ?? end.addingTimeInterval(1)
