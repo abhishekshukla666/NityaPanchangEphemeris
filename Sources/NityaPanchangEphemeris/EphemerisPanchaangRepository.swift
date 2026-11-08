@@ -356,7 +356,11 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         let nightStarts   = [5, 1, 4, 0, 3, 6, 2]
         let nightSegLen   = max(nextSunriseJD - sunsetJD, 1.0 / 1440.0) / 8.0
         let nightChaughariya: [Muhurat] = (0..<8).map { i in
-            let nameIdx = (nightStarts[weekday - 1] + i) % 7
+            // The night does not run in the day's order. Each period is the one five places on
+            // in the list above -- two back -- so a Sunday night reads Shubh, Amrit, Char, Rog,
+            // Kaal, Labh, Udveg, Shubh. Stepping one at a time, as the day does, put Rog and
+            // Kaal where Labh and Amrit belong.
+            let nameIdx = (nightStarts[weekday - 1] + 5 * i) % 7
             return Muhurat(name: chaughariyaNames[nameIdx],
                            startTime: jdToDate(sunsetJD + Double(i) * nightSegLen),
                            endTime:   jdToDate(sunsetJD + Double(i + 1) * nightSegLen),
