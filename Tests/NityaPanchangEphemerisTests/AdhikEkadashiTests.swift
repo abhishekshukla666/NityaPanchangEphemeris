@@ -65,7 +65,12 @@ final class AdhikEkadashiTests: XCTestCase {
         XCTAssertFalse(found.contains { $0.0 == "Padmini Ekadashi" })
         // Counted in days, not names: Margashirsha Shukla carries two — Mokshada
         // nationwide and Vaikuntha for the south — on the one day.
+        //
+        // Twenty-five, not twenty-four: a calendar year holds twenty-four or
+        // twenty-five Ekadashis whatever the Adhik months do, and 2027 has Saphala
+        // twice, on 3 January and 23 December, as published. This asserted 24
+        // while a name-and-year key dropped the second Saphala.
         let days = Set(found.map { cal.startOfDay(for: $0.1) })
-        XCTAssertEqual(days.count, 24, "twenty-four Ekadashi days in a year with no Adhik month")
+        XCTAssertEqual(days.count, 25, "2027's Ekadashi days, Saphala twice")
     }
 }

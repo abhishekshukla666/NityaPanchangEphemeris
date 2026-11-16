@@ -44,7 +44,18 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     private let wrapper = SwissEphWrapper()
     private var queue: DispatchQueue { Self.queue }
 
-    public init() {
+    /// Where the festivals are dated: Ujjain -- see referenceLatitude. Settable only so tests can
+    /// hold the engine to a published calendar computed for another city.
+    private let referenceLatitude: Double
+    private let referenceLongitude: Double
+
+    public convenience init() {
+        self.init(festivalReference: (Self.ujjainLatitude, Self.ujjainLongitude))
+    }
+
+    init(festivalReference: (latitude: Double, longitude: Double)) {
+        referenceLatitude = festivalReference.latitude
+        referenceLongitude = festivalReference.longitude
         // Enqueued, not awaited. This used to be `queue.sync`, which put the configure on the
         // queue correctly and blocked the CALLER until it got there -- and callers are views.
         // While the queue is busy the wait is as long as whatever is already on it: a year of
@@ -840,8 +851,8 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     // These dates are meant to be one nationally-agreed day, the way a printed calendar
     // publishes them, not something that shifts with the viewer's GPS the way a personal
     // Muhurat/Chaughariya rightly does.
-    private static let referenceLatitude  = 23.1765
-    private static let referenceLongitude = 75.7885
+    static let ujjainLatitude  = 23.1765
+    static let ujjainLongitude = 75.7885
 
     private func computeFestivals(from startDate: Date, to endDate: Date,
                                   tradition: EkadashiTradition = .default) -> [HinduFestival] {
@@ -972,7 +983,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
 
                     if cachedMadhyahnaTithi == nil {
                         let sunData      = wrapper.calculateSunTimes(
-                            for: startOfDay, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+                            for: startOfDay, latitude: referenceLatitude, longitude: referenceLongitude)
                         let sunriseRefJD = sunData.riseJD
                         let sunsetRefJD  = sunData.setJD
 
@@ -995,7 +1006,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
 
                     if cachedAparahnaTithi == nil {
                         let sunData      = wrapper.calculateSunTimes(
-                            for: startOfDay, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+                            for: startOfDay, latitude: referenceLatitude, longitude: referenceLongitude)
                         let sunriseRefJD = sunData.riseJD
                         let sunsetRefJD  = sunData.setJD
 
@@ -1033,23 +1044,25 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 if rule.lunarMonth == activeMonth && rule.matches(tithi: activeTithi) {
                     // Which day the vrat is kept on. Everything but an Ekadashi
                     // keeps the first sunrise its tithi touches, which is what
-                    // the `seen` set already gives it.
-                    //
-                    // A Vaishnava may not fast on a day the tithi is viddha,
-                    // and moves onto the next one. A Smarta householder keeps
-                    // the first day either way, so under that tradition this is
-                    // simply `current`.
+                    // the `seen` set already gives it; an Ekadashi follows its
+                    // own rules, and the two traditions' -- see ekadashiOffset.
                     var observed = current
                     if rule.resolvesForward, rule.tithiUpperBound == nil,
                        rule.observationTime == .sunrise,
-                       isVriddhi(dayStart: startOfDay, tithi: rule.tithiNumber, cal: cal)
-                           || (tradition == .vaishnava
-                               && isDashamiAtArunodaya(dayStart: startOfDay, tithi: rule.tithiNumber)),
-                       let next = cal.date(byAdding: .day, value: 1, to: current) {
-                        observed = next
+                       let moved = cal.date(byAdding: .day,
+                                            value: ekadashiOffset(udaya: startOfDay, tithi: rule.tithiNumber,
+                                                                  tradition: tradition, cal: cal),
+                                            to: current) {
+                        observed = moved
                     }
 
-                    let key = "\(rule.name)-\(calYear)"
+                    // An Ekadashi is keyed by its lunation, not the calendar year:
+                    // Saphala and Pausha Putrada can each fall twice in one year --
+                    // 7 January and 26 December 2024 -- and a name-and-year key kept
+                    // the first and silently dropped the second.
+                    let key = rule.resolvesForward
+                        ? "\(rule.name)-L\(Self.lunation(jdSunrise))"
+                        : "\(rule.name)-\(calYear)"
 
                     if seen.insert(key).inserted {
                         festivals.append(
@@ -1079,19 +1092,20 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             // text showed nothing at all for a whole month, roughly once every
             // thirty-three, while the Quick Lookup tile named them correctly.
             if isAdhikSunrise, tithiSunrise == 11 || tithiSunrise == 26 {
-                // Viddha moves the fast on, exactly as for every other
-                // Ekadashi — an Adhik month's are no different in that.
+                // Dated by the same rules as every other Ekadashi -- an Adhik
+                // month's are no different in that.
                 var observed = current
-                if isVriddhi(dayStart: startOfDay, tithi: tithiSunrise, cal: cal)
-                    || (tradition == .vaishnava
-                        && isDashamiAtArunodaya(dayStart: startOfDay, tithi: tithiSunrise)),
-                   let next = cal.date(byAdding: .day, value: 1, to: current) {
-                    observed = next
+                if let moved = cal.date(byAdding: .day,
+                                        value: ekadashiOffset(udaya: startOfDay, tithi: tithiSunrise,
+                                                              tradition: tradition, cal: cal),
+                                        to: current) {
+                    observed = moved
                 }
-                // Keyed on the tithi as well as the year: an Adhik month has
-                // two Ekadashis, one per paksha, and both are called Padmini.
-                // A name-and-year key would emit the first and swallow the second.
-                let key = "Padmini Ekadashi-\(tithiSunrise)-\(calYear)"
+                // Keyed on the tithi as well as the lunation: an Adhik month has two
+                // Ekadashis, one per paksha, both called Padmini and both inside one
+                // lunation, so a name-and-lunation key would emit the first and
+                // swallow the second.
+                let key = "Padmini Ekadashi-\(tithiSunrise)-L\(Self.lunation(jdSunrise))"
                 if seen.insert(key).inserted {
                     festivals.append(HinduFestival(name: "Padmini Ekadashi", date: observed,
                                                    emoji: "🛕", hasIcon: false))
@@ -1112,7 +1126,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             current = cal.date(byAdding: .day, value: 1, to: current) ?? endDate.addingTimeInterval(1)
         }
 
-        festivals += kshayaFallbackFestivals(from: startDate, to: endDate, seen: &seen)
+        festivals += kshayaFallbackFestivals(from: startDate, to: endDate, tradition: tradition, seen: &seen)
         festivals += holiFestivals(from: startDate, to: endDate, seen: &seen)
 
         // Festivals no tithi rule can express: two solar ingresses under
@@ -1225,9 +1239,9 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         var cursor = cursorStart
         while cursor <= scanEnd {
             let dayStart = cal.startOfDay(for: cursor)
-            let sunData = wrapper.calculateSunTimes(for: dayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+            let sunData = wrapper.calculateSunTimes(for: dayStart, latitude: referenceLatitude, longitude: referenceLongitude)
             let nextDayStart = cal.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
-            let nextSunData = wrapper.calculateSunTimes(for: nextDayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+            let nextSunData = wrapper.calculateSunTimes(for: nextDayStart, latitude: referenceLatitude, longitude: referenceLongitude)
 
             let sunsetJD      = sunData.setJD
             let nextSunriseJD = nextSunData.riseJD
@@ -1307,6 +1321,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     // need their own gap-tracking to fix correctly — a deliberate follow-on,
     // not bundled here.
     private func kshayaFallbackFestivals(from startDate: Date, to endDate: Date,
+                                          tradition: EkadashiTradition = .default,
                                           seen: inout Set<String>) -> [HinduFestival] {
         let cal = Calendar.current
         let windowStart = cal.startOfDay(for: startDate)
@@ -1320,7 +1335,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
 
         var fallback: [HinduFestival] = []
         var current = scanStart
-        var previous: (date: Date, tithi: Int, month: Int, isAdhik: Bool)?
+        var previous: (date: Date, tithi: Int, month: Int, isAdhik: Bool, jd: Double)?
 
         while current <= scanEnd {
             let startOfDay = cal.startOfDay(for: current)
@@ -1349,14 +1364,24 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                         where rule.observationTime == .sunrise
                             && rule.tithiNumber == skipped && rule.lunarMonth == skippedMonth {
                             let calYear = cal.component(.year, from: prev.date)
-                            let key = "\(rule.name)-\(calYear)"
+                            let key = rule.resolvesForward
+                                ? "\(rule.name)-L\(Self.lunation(prev.jd))"
+                                : "\(rule.name)-\(calYear)"
+                            // A kshaya Ekadashi -- one that holds no sunrise -- is the
+                            // Smarta's on the day it runs, with Dashami at that day's
+                            // sunrise; so a Vaishnava's is always the next.
+                            var date = prev.date
+                            if rule.resolvesForward, tradition == .vaishnava,
+                               let next = cal.date(byAdding: .day, value: 1, to: prev.date) {
+                                date = next
+                            }
                             if seen.insert(key).inserted {
                                 // regions must be carried here too. Without it a
                                 // festival whose tithi is kshaya that year came
                                 // back as .all and appeared for every reader --
                                 // Datta Jayanti did exactly that in 2026, when
                                 // the Margashirsha Purnima is skipped.
-                                fallback.append(HinduFestival(name: rule.name, date: prev.date,
+                                fallback.append(HinduFestival(name: rule.name, date: date,
                                                               emoji: rule.emoji, hasIcon: rule.hasIcon,
                                                               regions: rule.regions))
                             }
@@ -1365,7 +1390,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                 }
             }
 
-            previous = (startOfDay, tithi, month, isAdhik)
+            previous = (startOfDay, tithi, month, isAdhik, jdSunrise)
             current = cal.date(byAdding: .day, value: 1, to: current) ?? scanEnd.addingTimeInterval(1)
         }
 
@@ -1513,9 +1538,9 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     /// longer than this window, so at most one boundary can fall in it.
     private func pradoshOverlapOfTithi(jdDayStart: Double, tithi: Int) -> Int {
         let dayStart = jdToDate(jdDayStart)
-        let sunData = wrapper.calculateSunTimes(for: dayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        let sunData = wrapper.calculateSunTimes(for: dayStart, latitude: referenceLatitude, longitude: referenceLongitude)
         let sunsetJD = sunData.setJD
-        let nextSunData = wrapper.calculateSunTimes(for: jdToDate(jdDayStart + 1.0), latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        let nextSunData = wrapper.calculateSunTimes(for: jdToDate(jdDayStart + 1.0), latitude: referenceLatitude, longitude: referenceLongitude)
         let nextSunriseJD = nextSunData.riseJD
 
         let nightLen      = max(nextSunriseJD - sunsetJD, 1.0 / 1440.0)
@@ -1544,14 +1569,90 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     /// lunar month travels with the tithi that qualified, not with whatever
     /// happens to occupy the midpoint.
     private func anchorAtTithiInPradosh(jdDayStart: Double, tithi: Int) -> (tithi: Int, month: Int, isAdhik: Bool) {
-        let sunData = wrapper.calculateSunTimes(for: jdToDate(jdDayStart), latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        let sunData = wrapper.calculateSunTimes(for: jdToDate(jdDayStart), latitude: referenceLatitude, longitude: referenceLongitude)
         let sunsetJD = sunData.setJD
-        let nextSunData = wrapper.calculateSunTimes(for: jdToDate(jdDayStart + 1.0), latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        let nextSunData = wrapper.calculateSunTimes(for: jdToDate(jdDayStart + 1.0), latitude: referenceLatitude, longitude: referenceLongitude)
         let nextSunriseJD = nextSunData.riseJD
         let windowEnd = sunsetJD + max(nextSunriseJD - sunsetJD, 1.0 / 1440.0) / 5.0
         let at = Int(wrapper.calculateTithiNumber(forJulianDay: sunsetJD)) == tithi ? sunsetJD : windowEnd
         return anchor(at: at)
     }
+
+    // MARK: - Which day an Ekadashi is kept
+
+    /// How many days from `udaya` -- the first day an Ekadashi holds the sunrise -- its vrat is
+    /// kept, under each tradition.
+    ///
+    /// Fitted to, and tested against, Drik Panchang's Smartha and ISKCON lists for 2023-2028:
+    /// 149 Ekadashis, of which the two traditions part on 30. Every one of those 30 is one of the
+    /// cases below. A Smarta keeps:
+    ///
+    ///  - **the Udaya day**, ordinarily;
+    ///  - **the second day of a vriddhi** Ekadashi, one holding two sunrises -- so Amalaki 2023,
+    ///    Nirjala 2024, Rama 2024 and Vijaya 2027 were published, and so are the other three in
+    ///    those six years, under both traditions;
+    ///  - **the day before a trisprisha** -- when Ekadashi, Dwadashi and Trayodashi all touch the
+    ///    Udaya day, the Smartha list takes the day the Ekadashi began instead, and lists the
+    ///    trisprisha day as the second, "Gauna", one. Six times in six years, and the Smartha list
+    ///    never once kept a trisprisha day.
+    ///
+    /// A Vaishnava starts from the Smarta day and moves to the next on any of the three
+    /// Mahadvadashi conditions the Gaudiya calendar applies (see `vaishnavaMovesOn`).
+    private func ekadashiOffset(udaya dayStart: Date, tithi: Int,
+                                tradition: EkadashiTradition, cal: Calendar) -> Int {
+        let tomorrow = sunriseTithi(dayStart, plus: 1, cal: cal)
+        let smarta: Int
+        if tomorrow == tithi { smarta = 1 }                // vriddhi
+        else if tomorrow == tithi + 2 { smarta = -1 }      // trisprisha: Trayodashi by the next sunrise
+        else { smarta = 0 }
+        guard tradition == .vaishnava,
+              let smartaDay = cal.date(byAdding: .day, value: smarta, to: dayStart) else { return smarta }
+        return smarta + (vaishnavaMovesOn(smartaDay, tithi: tithi, cal: cal) ? 1 : 0)
+    }
+
+    /// Whether a Vaishnava keeps the day after the Smarta one -- the Dwadashi. On any of:
+    ///
+    ///  - **Dashami at arunodaya.** The Ekadashi had not begun ninety-six minutes before sunrise,
+    ///    so Dashami touched the vrat's day. This covers the trisprisha and kshaya days as well,
+    ///    whose Smarta day has Dashami at sunrise itself.
+    ///  - **Vyanjuli.** Dwadashi holds two sunrises.
+    ///  - **Pakshavardhini.** The Purnima or Amavasya ending the paksha holds two sunrises.
+    ///
+    /// The Gaudiya calendar's other Mahadvadashis, set by the nakshatra on the Dwadashi, moved no
+    /// Ekadashi in 2023-2028 and are not modelled.
+    private func vaishnavaMovesOn(_ smartaDay: Date, tithi: Int, cal: Calendar) -> Bool {
+        if isDashamiAtArunodaya(dayStart: smartaDay, tithi: tithi) { return true }
+        let dwadashi = tithi + 1
+        if sunriseTithi(smartaDay, plus: 1, cal: cal) == dwadashi,
+           sunriseTithi(smartaDay, plus: 2, cal: cal) == dwadashi { return true }
+        let pakshaEnd = tithi + 4
+        for k in 1...6 where sunriseTithi(smartaDay, plus: k, cal: cal) == pakshaEnd {
+            return sunriseTithi(smartaDay, plus: k + 1, cal: cal) == pakshaEnd
+        }
+        return false
+    }
+
+    /// The tithi at the reference sunrise `days` after `dayStart`.
+    private func sunriseTithi(_ dayStart: Date, plus days: Int, cal: Calendar) -> Int {
+        guard let day = cal.date(byAdding: .day, value: days, to: dayStart) else { return 0 }
+        return Int(wrapper.calculateTithiNumber(forJulianDay: referenceSunriseJD(for: day)))
+    }
+
+    /// The lunation an instant falls in, counted from the new moon of 6 January 2000. Mean, not
+    /// true, but an Ekadashi sits four days or more from either new moon, so the two cannot
+    /// disagree about one.
+    static func lunation(_ jd: Double) -> Int {
+        Int(((jd - 2_451_550.098) / 29.530_588_853).rounded(.down))
+    }
+
+    /// Whether Dashami was still running four ghatis before sunrise.
+    private func isDashamiAtArunodaya(dayStart: Date, tithi: Int) -> Bool {
+        let arunodaya = referenceSunriseJD(for: dayStart) - Self.arunodayaGhatis
+        return Int(wrapper.calculateTithiNumber(forJulianDay: arunodaya)) != tithi
+    }
+
+    /// Four ghatis, as a fraction of a day.
+    private static let arunodayaGhatis: Double = 96.0 / 1440.0
 
     /// Sunrise at the Ujjain reference for the day starting at `startOfDay` —
     /// the instant every Udaya Tithi festival rule is matched against.
@@ -1566,33 +1667,9 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     ///
     /// Falls back to the old proxy only where sunrise genuinely does not
     /// occur, matching computeDailySummaries: a scan must still yield a row.
-    /// Whether the tithi holds tomorrow's sunrise too.
-    ///
-    /// A vriddhi Ekadashi moves to its second day under BOTH traditions, not
-    /// only for Vaishnavas. Four published observances say so — Amalaki 2023,
-    /// Nirjala 2024, Rama 2024 and Vijaya 2027 — and a test pins all four. That
-    /// is what separates it from the arunodaya test below, which is the part
-    /// the two traditions actually disagree about.
-    ///
-    /// Read at the reference meridian, like every other festival decision here,
-    /// so a nationally-agreed date does not move with the reader's longitude.
-    private func isVriddhi(dayStart: Date, tithi: Int, cal: Calendar) -> Bool {
-        guard let tomorrow = cal.date(byAdding: .day, value: 1, to: dayStart) else { return false }
-        return Int(wrapper.calculateTithiNumber(forJulianDay: referenceSunriseJD(for: tomorrow))) == tithi
-    }
-
-    /// Whether Dashami was still running four ghatis before sunrise.
-    private func isDashamiAtArunodaya(dayStart: Date, tithi: Int) -> Bool {
-        let arunodaya = referenceSunriseJD(for: dayStart) - Self.arunodayaGhatis
-        return Int(wrapper.calculateTithiNumber(forJulianDay: arunodaya)) != tithi
-    }
-
-    /// Four ghatis, as a fraction of a day.
-    private static let arunodayaGhatis: Double = 96.0 / 1440.0
-
     private func referenceSunriseJD(for startOfDay: Date) -> Double {
         let sunData = wrapper.calculateSunTimes(
-            for: startOfDay, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+            for: startOfDay, latitude: referenceLatitude, longitude: referenceLongitude)
         let sunriseJD = sunData.riseJD
         return sunriseJD > 2_400_000
             ? sunriseJD
@@ -1642,7 +1719,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     private func sankrantiDeferringPastSunset(ingressJD: Double) -> Date {
         let cal = Calendar.current
         let ingressDayStart = cal.startOfDay(for: jdToDate(ingressJD))
-        let sunData = wrapper.calculateSunTimes(for: ingressDayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        let sunData = wrapper.calculateSunTimes(for: ingressDayStart, latitude: referenceLatitude, longitude: referenceLongitude)
         if ingressJD > sunData.setJD {
             return cal.date(byAdding: .day, value: 1, to: ingressDayStart) ?? ingressDayStart
         }
@@ -1660,7 +1737,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     private func sankrantiByHinduDay(ingressJD: Double) -> Date {
         let cal = Calendar.current
         let clockDayStart = cal.startOfDay(for: jdToDate(ingressJD))
-        let sunData = wrapper.calculateSunTimes(for: clockDayStart, latitude: Self.referenceLatitude, longitude: Self.referenceLongitude)
+        let sunData = wrapper.calculateSunTimes(for: clockDayStart, latitude: referenceLatitude, longitude: referenceLongitude)
         if ingressJD < sunData.riseJD {
             return cal.date(byAdding: .day, value: -1, to: clockDayStart) ?? clockDayStart
         }

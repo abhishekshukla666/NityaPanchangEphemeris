@@ -167,23 +167,15 @@ public struct FestivalRule: Sendable {
 /// answerable by reading one list.
 /// Which tradition's rule decides the day an Ekadashi vrat is kept on.
 ///
-/// The two agree on most of the twenty-four. They part on a day the Ekadashi
-/// tithi is *viddha* — touched by Dashami — which a Vaishnava may not fast on
-/// and a Smarta householder keeps anyway. Measured over 2026–2028 that is
-/// about one day a year.
+/// The two agree on most of the twenty-four, and part on about five a year: Drik Panchang's
+/// Smartha and ISKCON lists differ on 30 of 149 Ekadashis over 2023-2028. When they part, the
+/// Vaishnava fast is always the day after the Smarta one -- the Dwadashi -- and for one of three
+/// reasons: Dashami still running at arunodaya, ninety-six minutes before sunrise; Dwadashi
+/// holding two sunrises (Vyanjuli); or the paksha's Purnima or Amavasya holding two
+/// (Pakshavardhini). See EphemerisPanchaangRepository.ekadashiOffset, and the Drik fixtures in
+/// EkadashiTraditionTests that pin all 149.
 ///
-/// The split is narrower than it first looks. A *vriddhi* Ekadashi — one whose
-/// tithi holds two consecutive sunrises — moves to its second day under both
-/// traditions, which four published observances confirm: Amalaki 2023, Nirjala
-/// 2024, Rama 2024 and Vijaya 2027. What separates them is the other test:
-///
-///  - **Dashami at arunodaya.** The Ekadashi began inside the last four ghatis
-///    before sunrise — ninety-six minutes — so Dashami was still running at
-///    the hour the vrat's day is reckoned to start. A Vaishnava's fast moves to
-///    the following day; a Smarta householder keeps this one.
-///
-/// Nothing else in the app depends on this. It changes one date, and every
-/// surface that draws a festival follows.
+/// A *vriddhi* Ekadashi -- one holding two sunrises -- moves to its second day under both.
 public enum EkadashiTradition: String, Sendable, CaseIterable {
     /// The householder rule: the first sunrise the tithi touches, viddha or not.
     case smarta
