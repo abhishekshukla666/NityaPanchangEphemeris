@@ -199,4 +199,42 @@ final class EkadashiTraditionTests: XCTestCase {
         XCTAssertEqual(Set(engine).subtracting(published).sorted(), [], "dated by the engine only")
         XCTAssertEqual(Set(published).subtracting(engine).sorted(), [], "published only")
     }
+
+    // MARK: - Both at once
+
+    /// Devutthana 2026: the Smarta day and the Vaishnava day, one each and each tagged, from the
+    /// one list -- and Utpanna, a fortnight later, which both keep on the same day, once and
+    /// untagged.
+    func testBothTraditionsTagOnlyTheEkadashisTheyDateApart() async {
+        let all = await delhi.fetchFestivals(from: day(2026, 11, 15), to: day(2026, 12, 10), ekadashis: .both)
+        let devutthana = all.filter { $0.name == "Devutthana Ekadashi" }
+            .map { (cal.startOfDay(for: $0.date), $0.tradition) }
+        XCTAssertEqual(devutthana.count, 2)
+        XCTAssertEqual(devutthana.first?.0, day(2026, 11, 20))
+        XCTAssertEqual(devutthana.first?.1, .smarta)
+        XCTAssertEqual(devutthana.last?.0, day(2026, 11, 21))
+        XCTAssertEqual(devutthana.last?.1, .vaishnava)
+
+        let utpanna = all.filter { $0.name == "Utpanna Ekadashi" }
+        XCTAssertEqual(utpanna.count, 1)
+        XCTAssertNil(utpanna.first?.tradition)
+        XCTAssertTrue(all.filter { !$0.name.hasSuffix("Ekadashi") }.allSatisfy { $0.tradition == nil })
+    }
+
+    /// Asked for both, the six years come out as the union of the two published lists: every
+    /// Smartha day, and every ISKCON day that differs from it.
+    func testBothIsTheUnionOfTheTwoLists() async {
+        let names = Set(PanchaangHelper.shuklaEkadashiNames + PanchaangHelper.krishnaEkadashiNames
+                        + ["Padmini Ekadashi"])
+        let f = DateFormatter()
+        f.calendar = cal; f.timeZone = cal.timeZone; f.dateFormat = "yyyy-MM-dd"
+        let both = await delhi.fetchFestivals(from: day(2023, 1, 1), to: day(2028, 12, 31), ekadashis: .both)
+            .filter { names.contains($0.name) }
+        let smarta = Set(both.filter { $0.tradition != .vaishnava }.map { f.string(from: $0.date) })
+            .filter { $0 >= "2023-01-01" && $0 <= "2028-12-31" }
+        let vaishnava = Set(both.filter { $0.tradition != .smarta }.map { f.string(from: $0.date) })
+            .filter { $0 >= "2023-01-01" && $0 <= "2028-12-31" }
+        XCTAssertEqual(smarta, Set(Self.drikSmartha))
+        XCTAssertEqual(vaishnava, Set(Self.drikVaishnava.map { $0 == "2026-06-25" ? "2026-06-26" : $0 }))
+    }
 }

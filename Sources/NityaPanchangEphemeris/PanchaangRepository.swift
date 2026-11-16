@@ -23,6 +23,11 @@ public protocol PanchaangRepository: Sendable {
     func fetchFestivals(from startDate: Date, to endDate: Date,
                         tradition: EkadashiTradition) async -> [HinduFestival]
 
+    /// The same, with an Ekadashi the two traditions date apart on both its days -- see
+    /// EkadashiDating.
+    func fetchFestivals(from startDate: Date, to endDate: Date,
+                        ekadashis: EkadashiDating) async -> [HinduFestival]
+
     /// Moon nakshatra/pada/rashi + Mars rashi + Lagna rashi for an arbitrary birth
     /// date+time+location — used for Guna Milan (marriage matching) and Kundli charts.
     func fetchBirthChart(for date: Date, latitude: Double, longitude: Double) async -> BirthChart
@@ -107,5 +112,14 @@ public extension PanchaangRepository {
     func fetchFestivals(from startDate: Date, to endDate: Date,
                         tradition: EkadashiTradition) async -> [HinduFestival] {
         await fetchFestivals(from: startDate, to: endDate)
+    }
+
+    /// Likewise: conformers that date no Ekadashi of their own answer with their one list.
+    func fetchFestivals(from startDate: Date, to endDate: Date,
+                        ekadashis: EkadashiDating) async -> [HinduFestival] {
+        switch ekadashis {
+        case .tradition(let t): await fetchFestivals(from: startDate, to: endDate, tradition: t)
+        case .both: await fetchFestivals(from: startDate, to: endDate)
+        }
     }
 }

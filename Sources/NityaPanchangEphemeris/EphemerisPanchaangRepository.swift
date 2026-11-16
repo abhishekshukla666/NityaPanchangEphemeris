@@ -97,7 +97,17 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
         await withCheckedContinuation { continuation in
             queue.async { [self] in
                 continuation.resume(
-                    returning: computeFestivals(from: startDate, to: endDate, tradition: tradition))
+                    returning: computeFestivals(from: startDate, to: endDate, ekadashis: .tradition(tradition)))
+            }
+        }
+    }
+
+    public func fetchFestivals(from startDate: Date, to endDate: Date,
+                               ekadashis: EkadashiDating) async -> [HinduFestival] {
+        await withCheckedContinuation { continuation in
+            queue.async { [self] in
+                continuation.resume(
+                    returning: computeFestivals(from: startDate, to: endDate, ekadashis: ekadashis))
             }
         }
     }
@@ -855,7 +865,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     static let ujjainLongitude = 75.7885
 
     private func computeFestivals(from startDate: Date, to endDate: Date,
-                                  tradition: EkadashiTradition = .default) -> [HinduFestival] {
+                                  ekadashis: EkadashiDating = .tradition(.default)) -> [HinduFestival] {
         let cal = Calendar.current
         var festivals: [HinduFestival] = []
         var seen: Set<String> = []
@@ -1045,35 +1055,35 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                     // Which day the vrat is kept on. Everything but an Ekadashi
                     // keeps the first sunrise its tithi touches, which is what
                     // the `seen` set already gives it; an Ekadashi follows its
-                    // own rules, and the two traditions' -- see ekadashiOffset.
-                    var observed = current
-                    if rule.resolvesForward, rule.tithiUpperBound == nil,
-                       rule.observationTime == .sunrise,
-                       let moved = cal.date(byAdding: .day,
-                                            value: ekadashiOffset(udaya: startOfDay, tithi: rule.tithiNumber,
-                                                                  tradition: tradition, cal: cal),
-                                            to: current) {
-                        observed = moved
-                    }
-
+                    // own rules, and the two traditions' -- see ekadashiDays.
+                    //
                     // An Ekadashi is keyed by its lunation, not the calendar year:
                     // Saphala and Pausha Putrada can each fall twice in one year --
                     // 7 January and 26 December 2024 -- and a name-and-year key kept
                     // the first and silently dropped the second.
+                    let isEkadashi = rule.resolvesForward && rule.tithiUpperBound == nil
+                        && rule.observationTime == .sunrise
                     let key = rule.resolvesForward
                         ? "\(rule.name)-L\(Self.lunation(jdSunrise))"
                         : "\(rule.name)-\(calYear)"
 
                     if seen.insert(key).inserted {
-                        festivals.append(
-                            HinduFestival(
-                                name: rule.name,
-                                date: observed,
-                                emoji: rule.emoji,
-                                hasIcon: rule.hasIcon,
-                                regions: rule.regions
+                        let days = isEkadashi
+                            ? ekadashiDays(udaya: startOfDay, current: current, tithi: rule.tithiNumber,
+                                           ekadashis: ekadashis, cal: cal)
+                            : [(current, nil)]
+                        for (observed, tradition) in days {
+                            festivals.append(
+                                HinduFestival(
+                                    name: rule.name,
+                                    date: observed,
+                                    emoji: rule.emoji,
+                                    hasIcon: rule.hasIcon,
+                                    regions: rule.regions,
+                                    tradition: tradition
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }
@@ -1092,23 +1102,18 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             // text showed nothing at all for a whole month, roughly once every
             // thirty-three, while the Quick Lookup tile named them correctly.
             if isAdhikSunrise, tithiSunrise == 11 || tithiSunrise == 26 {
-                // Dated by the same rules as every other Ekadashi -- an Adhik
-                // month's are no different in that.
-                var observed = current
-                if let moved = cal.date(byAdding: .day,
-                                        value: ekadashiOffset(udaya: startOfDay, tithi: tithiSunrise,
-                                                              tradition: tradition, cal: cal),
-                                        to: current) {
-                    observed = moved
-                }
                 // Keyed on the tithi as well as the lunation: an Adhik month has two
                 // Ekadashis, one per paksha, both called Padmini and both inside one
                 // lunation, so a name-and-lunation key would emit the first and
                 // swallow the second.
                 let key = "Padmini Ekadashi-\(tithiSunrise)-L\(Self.lunation(jdSunrise))"
                 if seen.insert(key).inserted {
-                    festivals.append(HinduFestival(name: "Padmini Ekadashi", date: observed,
-                                                   emoji: "🛕", hasIcon: false))
+                    // Dated by the same rules as every other Ekadashi.
+                    for (observed, tradition) in ekadashiDays(udaya: startOfDay, current: current,
+                                                              tithi: tithiSunrise, ekadashis: ekadashis, cal: cal) {
+                        festivals.append(HinduFestival(name: "Padmini Ekadashi", date: observed,
+                                                       emoji: "🛕", hasIcon: false, tradition: tradition))
+                    }
                 }
             }
 
@@ -1126,7 +1131,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             current = cal.date(byAdding: .day, value: 1, to: current) ?? endDate.addingTimeInterval(1)
         }
 
-        festivals += kshayaFallbackFestivals(from: startDate, to: endDate, tradition: tradition, seen: &seen)
+        festivals += kshayaFallbackFestivals(from: startDate, to: endDate, ekadashis: ekadashis, seen: &seen)
         festivals += holiFestivals(from: startDate, to: endDate, seen: &seen)
 
         // Festivals no tithi rule can express: two solar ingresses under
@@ -1321,7 +1326,7 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
     // need their own gap-tracking to fix correctly — a deliberate follow-on,
     // not bundled here.
     private func kshayaFallbackFestivals(from startDate: Date, to endDate: Date,
-                                          tradition: EkadashiTradition = .default,
+                                          ekadashis: EkadashiDating = .tradition(.default),
                                           seen: inout Set<String>) -> [HinduFestival] {
         let cal = Calendar.current
         let windowStart = cal.startOfDay(for: startDate)
@@ -1370,10 +1375,13 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                             // A kshaya Ekadashi -- one that holds no sunrise -- is the
                             // Smarta's on the day it runs, with Dashami at that day's
                             // sunrise; so a Vaishnava's is always the next.
-                            var date = prev.date
-                            if rule.resolvesForward, tradition == .vaishnava,
-                               let next = cal.date(byAdding: .day, value: 1, to: prev.date) {
-                                date = next
+                            var days: [(Date, EkadashiTradition?)] = [(prev.date, nil)]
+                            if rule.resolvesForward, let next = cal.date(byAdding: .day, value: 1, to: prev.date) {
+                                switch ekadashis {
+                                case .tradition(.smarta): break
+                                case .tradition(.vaishnava): days = [(next, nil)]
+                                case .both: days = [(prev.date, .smarta), (next, .vaishnava)]
+                                }
                             }
                             if seen.insert(key).inserted {
                                 // regions must be carried here too. Without it a
@@ -1381,9 +1389,11 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                                 // back as .all and appeared for every reader --
                                 // Datta Jayanti did exactly that in 2026, when
                                 // the Margashirsha Purnima is skipped.
-                                fallback.append(HinduFestival(name: rule.name, date: date,
-                                                              emoji: rule.emoji, hasIcon: rule.hasIcon,
-                                                              regions: rule.regions))
+                                for (date, tradition) in days {
+                                    fallback.append(HinduFestival(name: rule.name, date: date,
+                                                                  emoji: rule.emoji, hasIcon: rule.hasIcon,
+                                                                  regions: rule.regions, tradition: tradition))
+                                }
                             }
                         }
                     }
@@ -1630,6 +1640,24 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             return sunriseTithi(smartaDay, plus: k + 1, cal: cal) == pakshaEnd
         }
         return false
+    }
+
+    /// The day or days an Ekadashi goes on, from `current`, its Udaya day: one, untagged, for a
+    /// single tradition or where both keep the same day; two, each tagged, where they part.
+    private func ekadashiDays(udaya dayStart: Date, current: Date, tithi: Int,
+                              ekadashis: EkadashiDating, cal: Calendar) -> [(Date, EkadashiTradition?)] {
+        func day(_ tradition: EkadashiTradition) -> Date {
+            cal.date(byAdding: .day,
+                     value: ekadashiOffset(udaya: dayStart, tithi: tithi, tradition: tradition, cal: cal),
+                     to: current) ?? current
+        }
+        switch ekadashis {
+        case .tradition(let t):
+            return [(day(t), nil)]
+        case .both:
+            let smarta = day(.smarta), vaishnava = day(.vaishnava)
+            return smarta == vaishnava ? [(smarta, nil)] : [(smarta, .smarta), (vaishnava, .vaishnava)]
+        }
     }
 
     /// The tithi at the reference sunrise `days` after `dayStart`.

@@ -73,14 +73,22 @@ public struct HinduFestival: Identifiable, Sendable {
     /// caller that does not care — keeps compiling and keeps meaning "kept
     /// everywhere".
     public let regions: FestivalRegion
+    /// The one tradition that keeps this day, for an Ekadashi the two traditions date apart --
+    /// the Smarta day and the Vaishnava day, one each. Nil for every other festival, and for an
+    /// Ekadashi both keep on the same day.
+    ///
+    /// Only ever set when both traditions were asked for (`EkadashiDating.both`): asked for one,
+    /// there is nothing to tell apart.
+    public let tradition: EkadashiTradition?
 
     public init(name: String, date: Date, emoji: String, hasIcon: Bool,
-                regions: FestivalRegion = .all) {
+                regions: FestivalRegion = .all, tradition: EkadashiTradition? = nil) {
         self.name = name
         self.date = date
         self.emoji = emoji
         self.hasIcon = hasIcon
         self.regions = regions
+        self.tradition = tradition
     }
 }
 
@@ -185,6 +193,16 @@ public enum EkadashiTradition: String, Sendable, CaseIterable {
     /// Smarta. The householder practice is the commoner one, and it is what a
     /// printed panchang leads with.
     public static let `default`: EkadashiTradition = .smarta
+}
+
+/// Which Ekadashi dates a festival list carries: one tradition's, or both.
+///
+/// With `.both`, an Ekadashi the two traditions keep on the same day comes once, untagged; one
+/// they date apart comes twice, the Smarta day and the Vaishnava day, each tagged with its
+/// tradition (`HinduFestival.tradition`). Every other festival is the same under all three.
+public enum EkadashiDating: Sendable, Equatable {
+    case tradition(EkadashiTradition)
+    case both
 }
 
 public let allFestivalRules: [FestivalRule] =
