@@ -8,7 +8,7 @@
 import XCTest
 @testable import NityaPanchangEphemeris
 
-/// Both Ekadashis of an Adhik month are Padmini, and no rule in the festival
+/// An Adhik month's Ekadashis are Padmini and Parama, and no rule in the festival
 /// table can name them: every rule matches on a month number the Adhik month
 /// shares with the ordinary one, and the scan skips the whole table while an
 /// Adhik month runs. So the calendar drew nothing at all for a month, once
@@ -38,8 +38,8 @@ final class AdhikEkadashiTests: XCTestCase {
     func testAnAdhikMonthsEkadashisAreDrawn() async {
         let found = await ekadashis(day(2026, 5, 17), day(2026, 6, 15))
         XCTAssertEqual(found.count, 2, "both pakshas, one Ekadashi each")
-        XCTAssertTrue(found.allSatisfy { $0.0 == "Padmini Ekadashi" },
-                      "an Adhik month's Ekadashis are Padmini: \(found.map(\.0))")
+        // Padmini in the Shukla paksha, Parama in the Krishna, as Drik Panchang publishes them.
+        XCTAssertEqual(found.map(\.0), ["Padmini Ekadashi", "Parama Ekadashi"])
 
         let days = found.map { cal.component(.day, from: $0.1) }
         XCTAssertEqual(days, [27, 11], "the vriddhi is kept on the second day")
@@ -53,8 +53,8 @@ final class AdhikEkadashiTests: XCTestCase {
         let found = await ekadashis(day(2026, 6, 16), day(2026, 7, 15))
         XCTAssertTrue(found.contains { $0.0 == "Nirjala Ekadashi" },
                       "real Jyeshtha still gets Nirjala: \(found.map(\.0))")
-        XCTAssertFalse(found.contains { $0.0 == "Padmini Ekadashi" },
-                       "Padmini belongs to the Adhik month alone")
+        XCTAssertFalse(found.contains { $0.0 == "Padmini Ekadashi" || $0.0 == "Parama Ekadashi" },
+                       "Padmini and Parama belong to the Adhik month alone")
     }
 
     /// An ordinary year has no Padmini at all. Guards the failure that would be
@@ -62,7 +62,7 @@ final class AdhikEkadashiTests: XCTestCase {
     /// Adhik one.
     func testAnOrdinaryYearHasNoPadmini() async {
         let found = await ekadashis(day(2027, 1, 1), day(2027, 12, 31))
-        XCTAssertFalse(found.contains { $0.0 == "Padmini Ekadashi" })
+        XCTAssertFalse(found.contains { $0.0 == "Padmini Ekadashi" || $0.0 == "Parama Ekadashi" })
         // Counted in days, not names: Margashirsha Shukla carries two — Mokshada
         // nationwide and Vaikuntha for the south — on the one day.
         //

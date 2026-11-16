@@ -167,7 +167,7 @@ final class EkadashiTraditionTests: XCTestCase {
 
     private func ekadashiDays(_ tradition: EkadashiTradition) async -> [String] {
         let names = Set(PanchaangHelper.shuklaEkadashiNames + PanchaangHelper.krishnaEkadashiNames
-                        + ["Padmini Ekadashi"])
+                        + ["Padmini Ekadashi", "Parama Ekadashi"])
         let f = DateFormatter()
         f.calendar = cal; f.timeZone = cal.timeZone; f.dateFormat = "yyyy-MM-dd"
         return await delhi.fetchFestivals(from: day(2023, 1, 1), to: day(2028, 12, 31), tradition: tradition)
@@ -225,7 +225,7 @@ final class EkadashiTraditionTests: XCTestCase {
     /// Smartha day, and every ISKCON day that differs from it.
     func testBothIsTheUnionOfTheTwoLists() async {
         let names = Set(PanchaangHelper.shuklaEkadashiNames + PanchaangHelper.krishnaEkadashiNames
-                        + ["Padmini Ekadashi"])
+                        + ["Padmini Ekadashi", "Parama Ekadashi"])
         let f = DateFormatter()
         f.calendar = cal; f.timeZone = cal.timeZone; f.dateFormat = "yyyy-MM-dd"
         let both = await delhi.fetchFestivals(from: day(2023, 1, 1), to: day(2028, 12, 31), ekadashis: .both)

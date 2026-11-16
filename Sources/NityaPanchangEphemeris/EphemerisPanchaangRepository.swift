@@ -1095,23 +1095,24 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
             // and takes the Ekadashis with it.
             //
             // They are not skipped observances, though. Both of an Adhik
-            // month's Ekadashis are kept, and both are Padmini — the one
-            // Ekadashi name that belongs to no month, which is why
-            // getEkadashiName returns it from a branch rather than a table.
-            // Without this the calendar, the festival ribbon and the share
-            // text showed nothing at all for a whole month, roughly once every
-            // thirty-three, while the Quick Lookup tile named them correctly.
+            // month's Ekadashis are kept, under the two names that belong to
+            // no month -- Padmini in the Shukla paksha, Parama in the Krishna --
+            // which is why getEkadashiName returns them from a branch rather
+            // than a table. Without this the calendar, the festival ribbon and
+            // the share text showed nothing at all for a whole month, roughly
+            // once every thirty-three, while the Quick Lookup tile named them.
             if isAdhikSunrise, tithiSunrise == 11 || tithiSunrise == 26 {
-                // Keyed on the tithi as well as the lunation: an Adhik month has two
-                // Ekadashis, one per paksha, both called Padmini and both inside one
-                // lunation, so a name-and-lunation key would emit the first and
-                // swallow the second.
-                let key = "Padmini Ekadashi-\(tithiSunrise)-L\(Self.lunation(jdSunrise))"
+                let name = PanchaangHelper.getEkadashiName(lunarMonth: monthSunrise,
+                                                           paksha: tithiSunrise == 26 ? .shukla : .krishna,
+                                                           isAdhik: true)
+                // Keyed on the tithi as well as the lunation: an Adhik month's two
+                // Ekadashis sit inside one lunation.
+                let key = "\(name)-\(tithiSunrise)-L\(Self.lunation(jdSunrise))"
                 if seen.insert(key).inserted {
                     // Dated by the same rules as every other Ekadashi.
                     for (observed, tradition) in ekadashiDays(udaya: startOfDay, current: current,
                                                               tithi: tithiSunrise, ekadashis: ekadashis, cal: cal) {
-                        festivals.append(HinduFestival(name: "Padmini Ekadashi", date: observed,
+                        festivals.append(HinduFestival(name: name, date: observed,
                                                        emoji: "🛕", hasIcon: false, tradition: tradition))
                     }
                 }

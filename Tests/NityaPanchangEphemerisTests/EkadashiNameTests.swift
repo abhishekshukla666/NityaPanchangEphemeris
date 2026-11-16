@@ -60,12 +60,13 @@ final class EkadashiNameTests: XCTestCase {
     }
 
     /// An Adhik month repeats a month number, so the table would otherwise hand
-    /// back the ordinary month's name. Both of its Ekadashis are Padmini.
-    func testAnAdhikMonthsEkadashisAreBothPadmini() {
+    /// back the ordinary month's name. Its Shukla Ekadashi is Padmini and its
+    /// Krishna one Parama, as Drik Panchang publishes them: 27 May and 11 June 2026.
+    func testAnAdhikMonthsEkadashisArePadminiAndParama() {
         XCTAssertEqual(PanchaangHelper.getEkadashiName(lunarMonth: 3, paksha: .shukla, isAdhik: true),
                        "Padmini Ekadashi")
         XCTAssertEqual(PanchaangHelper.getEkadashiName(lunarMonth: 3, paksha: .krishna, isAdhik: true),
-                       "Padmini Ekadashi")
+                       "Parama Ekadashi")
     }
 
     /// No two Ekadashis share a name, which is the property the two qualified
