@@ -1,7 +1,8 @@
 import XCTest
 @testable import NityaPanchangEphemeris
 
-/// Gulika, Yamaganda and Amrit — the parts of the day the wrapper tabulates.
+/// Gulika and Yamaganda — the parts of the day the wrapper tabulates. Amrit Kaal is not one of
+/// them: it comes from the nakshatra, and is checked in DrikMuhuratTests.
 final class DayPartMuhuratTests: XCTestCase {
 
     private let repo = EphemerisPanchaangRepository()
@@ -64,23 +65,6 @@ final class DayPartMuhuratTests: XCTestCase {
         let p = await day(saturday)
         let gulika = try XCTUnwrap(muhurat("Gulik Kaal", in: p) ?? muhurat("Gulika", in: p))
         XCTAssertEqual(eighth(gulika.startTime, in: p), 0)
-    }
-
-    /// The muhurat list and the chaughariya list draw the same Amrit period, so
-    /// they must place it at the same time. They did not: the muhurat table was
-    /// an eighth of the day late on Tuesday, Thursday and Saturday.
-    func testAmritAgreesWithTheChaughariyaListEveryDay() async throws {
-        for date in week {
-            let p = await day(date)
-            let fromMuhurats = try XCTUnwrap(muhurat("Amrit Kaal", in: p) ?? muhurat("Amrit", in: p),
-                                             "no Amrit muhurat on \(p.vara)")
-            let fromChaughariya = try XCTUnwrap(p.chaughariya.first { $0.name == "Amrit" },
-                                                "no Amrit chaughariya on \(p.vara)")
-            XCTAssertEqual(fromMuhurats.startTime.timeIntervalSince1970,
-                           fromChaughariya.startTime.timeIntervalSince1970,
-                           accuracy: 1,
-                           "\(p.vara): the two lists disagree about Amrit")
-        }
     }
 
     /// Rahu Kaal is not part of the lord scheme and its table is the standard

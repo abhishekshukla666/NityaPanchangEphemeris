@@ -24,7 +24,13 @@ final class NityaPanchangEphemerisTests: XCTestCase {
         XCTAssertEqual(panchang.planetPositions.count, 9, "expected all 9 Navagraha positions")
         XCTAssertEqual(panchang.horas.count, 24, "expected 12 day + 12 night horas")
         XCTAssertFalse(panchang.lagnas.isEmpty)
-        XCTAssertEqual(panchang.muhurats.count, 8)
+        // The seven fixed ones -- six on a Wednesday, which has no Abhijit -- and Amrit Kaal and
+        // Varjyam from the nakshatra, none to two of each.
+        let fixed = ["Brahma Muhurat", "Abhijit Muhurat", "Vijaya Muhurat", "Godhuli Muhurat",
+                     "Rahu Kaal", "Yamaganda", "Gulik Kaal"]
+        XCTAssertEqual(panchang.muhurats.filter { fixed.contains($0.name) }.count, 7)   // a Thursday
+        XCTAssertTrue((0...2).contains(panchang.muhurats.filter { $0.name == "Amrit Kaal" }.count))
+        XCTAssertTrue((0...3).contains(panchang.muhurats.filter { $0.name == "Varjyam" }.count))
         XCTAssertEqual(panchang.chaughariya.count, 8)
         XCTAssertEqual(panchang.nightChaughariya.count, 8)
     }

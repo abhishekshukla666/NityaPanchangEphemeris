@@ -321,16 +321,21 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
 
         func jdTime(_ key: String) -> Date { jdToDate(mData[key] as? Double ?? 0) }
 
-        let muhurats: [Muhurat] = [
-            Muhurat(name: "Brahma Muhurat",  startTime: jdTime("brahmaStart"),  endTime: jdTime("brahmaEnd"),  type: .auspicious),
-            Muhurat(name: "Amrit Kaal",      startTime: jdTime("amritStart"),   endTime: jdTime("amritEnd"),   type: .auspicious),
+        // Abhijit is not kept on a Wednesday, when Drik Panchang lists none: the midday
+        // muhurta is held to turn malefic on that weekday. Left out rather than marked, so
+        // every caller that looks it up -- the morning notice, the share card, a festival's
+        // puja windows -- finds no Abhijit that day, as a printed panchang shows none.
+        let abhijit: [Muhurat] = weekday == 4 ? [] : [
             Muhurat(name: "Abhijit Muhurat", startTime: jdTime("abhijitStart"), endTime: jdTime("abhijitEnd"), type: .auspicious),
+        ]
+        var muhurats: [Muhurat] = abhijit + [
+            Muhurat(name: "Brahma Muhurat",  startTime: jdTime("brahmaStart"),  endTime: jdTime("brahmaEnd"),  type: .auspicious),
             Muhurat(name: "Vijaya Muhurat",  startTime: jdTime("vijayaStart"),  endTime: jdTime("vijayaEnd"),  type: .auspicious),
             Muhurat(name: "Godhuli Muhurat", startTime: jdTime("godhuliStart"), endTime: jdTime("godhuliEnd"), type: .neutral),
             Muhurat(name: "Rahu Kaal",       startTime: jdTime("rahuStart"),    endTime: jdTime("rahuEnd"),    type: .inauspicious),
             Muhurat(name: "Yamaganda",       startTime: jdTime("yamaStart"),    endTime: jdTime("yamaEnd"),    type: .inauspicious),
             Muhurat(name: "Gulik Kaal",      startTime: jdTime("gulikStart"),   endTime: jdTime("gulikEnd"),   type: .neutral),
-        ].sorted { $0.startTime < $1.startTime }
+        ]
 
         // Navagraha positions at sunrise
         let rawPlanets      = wrapper.calculatePlanetPositions(forJulianDay: refJD)
@@ -392,6 +397,10 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
                                    nextSunriseJD: nextSunriseJD, weekday: weekday)
         let lagnas = computeLagnas(sunriseJD: sunriseJD, sunsetJD: sunsetJD, nextSunriseJD: nextSunriseJD,
                                    latitude: latitude, longitude: longitude)
+        // Amrit Kaal and Varjyam, from the nakshatras this day touches: none, one or two of
+        // each, some of them after midnight.
+        muhurats += computeNakshatraWindows(sunriseJD: sunriseJD, nextSunriseJD: nextSunriseJD)
+        muhurats.sort { $0.startTime < $1.startTime }
         let bhadraKaal = computeBhadraKaal(sunriseJD: sunriseJD, nextSunriseJD: nextSunriseJD)
         let panchakKaal = computePanchakKaal(sunriseJD: sunriseJD, nextSunriseJD: nextSunriseJD)
         let gandaMoolaKaal = computeGandaMoolaKaal(sunriseJD: sunriseJD, nextSunriseJD: nextSunriseJD)
@@ -594,6 +603,37 @@ public final class EphemerisPanchaangRepository: PanchaangRepository, @unchecked
 
         return Muhurat(name: "Ganda Moola", startTime: jdToDate(startJD),
                        endTime: jdToDate(endJD), type: .inauspicious)
+    }
+
+    /// Amrit Kaal and Varjyam for the panchang day: every one that begins between this sunrise
+    /// and the next, as Drik Panchang lists them. One that began before sunrise belongs to the
+    /// day before, even if it runs on into this one.
+    ///
+    /// The nakshatra running at sunrise is taken from its true start, not from sunrise: its
+    /// windows sit at fractions of the whole nakshatra, and Ashlesha's Amrit Kaal, at its 56th
+    /// ghati, falls a day after it began.
+    private func computeNakshatraWindows(sunriseJD: Double, nextSunriseJD: Double) -> [Muhurat] {
+        var out: [Muhurat] = []
+        var startJD = wrapper.calculateNakshatraStartTime(forJulianDay: sunriseJD)
+        var insideJD = sunriseJD
+        // Up to three nakshatras can touch one day; bounded so a search that fails to advance
+        // cannot spin inside the ephemeris queue.
+        for _ in 0..<4 {
+            guard startJD < nextSunriseJD else { break }
+            let number = Int(wrapper.calculateNakshatra(forJulianDay: insideJD))
+            let endJD = wrapper.calculateNakshatraEndTime(forJulianDay: insideJD)
+            guard endJD > startJD else { break }
+            func add(_ name: String, _ type: MuhuratType, _ windows: [(start: Double, end: Double)]) {
+                for w in windows where w.start >= sunriseJD && w.start < nextSunriseJD {
+                    out.append(Muhurat(name: name, startTime: jdToDate(w.start), endTime: jdToDate(w.end), type: type))
+                }
+            }
+            add("Amrit Kaal", .auspicious, NakshatraWindows.amrit(nakshatra: number, start: startJD, end: endJD))
+            add("Varjyam", .inauspicious, NakshatraWindows.varjyam(nakshatra: number, start: startJD, end: endJD))
+            startJD = endJD
+            insideJD = endJD + 1.0 / 1440.0
+        }
+        return out
     }
 
     /// The Panchak window touching this panchang day, if any.

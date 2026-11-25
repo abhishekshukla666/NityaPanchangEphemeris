@@ -312,8 +312,11 @@ static void getAmantaMonthDetails(SwissEphWrapper *self, double jd, int *monthIn
     double abhijitStart = sunriseJD + 7.0 * muhuratLength15;
     double abhijitEnd   = abhijitStart + muhuratLength15;
 
-    // ── Vijaya (10th of 15) ───────────────────────────────────────────────
-    double vijayaStart = sunriseJD + 9.0 * muhuratLength15;
+    // ── Vijaya (11th of 15) ───────────────────────────────────────────────
+    //
+    // The eleventh of the day's fifteen, as Drik Panchang labels it: 1:53-2:36 PM at New
+    // Delhi on 25 Nov 2026. This was the tenth, a muhurta early.
+    double vijayaStart = sunriseJD + 10.0 * muhuratLength15;
     double vijayaEnd   = vijayaStart + muhuratLength15;
 
     // ── Rahu / Yama / Gulik (1/8 segments by weekday) ────────────────────
@@ -346,32 +349,34 @@ static void getAmantaMonthDetails(SwissEphWrapper *self, double jd, int *monthIn
     double gulikStart = sunriseJD + (gulikSegments[weekday - 1] - 1) * muhuratLength8;
     double gulikEnd   = gulikStart + muhuratLength8;
 
-    // ── Brahma Muhurat: 96–48 minutes before sunrise ─────────────────────
-    double brahmaStart = sunriseJD - (96.0 / 1440.0);
-    double brahmaEnd   = sunriseJD - (48.0 / 1440.0);
+    // ── Brahma Muhurat: the night's fourteenth muhurta ───────────────────
+    //
+    // The night, sunset to sunrise, in fifteen muhurtas; Brahma Muhurat is the fourteenth,
+    // the one before the last. Drik Panchang's times for New Delhi fit this to the minute in
+    // December (5:04-5:58 AM, a 54-minute muhurta) and in June (4:04-4:44 AM, 40 minutes).
+    // It was a fixed 96-48 minutes before sunrise, ten minutes late on a winter morning.
+    //
+    // The night before this sunrise is a day less this day's daylight, to well within a
+    // minute: the day lengthens or shortens by a minute or two at most from one to the next.
+    double nightDuration = 1.0 - dayDuration;
+    double nightMuhurta  = nightDuration / 15.0;
+    double brahmaStart = sunriseJD - 2.0 * nightMuhurta;
+    double brahmaEnd   = sunriseJD - nightMuhurta;
 
-    // ── Amrit Kaal (Chaughadia Amrit, daytime) ────────────────────────────
-    //
-    // Derived rather than tabulated, so it cannot drift from the chaughariya list the app
-    // draws beside it — which is exactly where the old table disagreed.
-    //
-    // A day's chaughariyas run Udveg, Char, Labh, Amrit, Kaal, Shubh, Rog on a seven-cycle,
-    // starting at the type ruled by the weekday's lord. EphemerisPanchaangRepository holds
-    // those same starting offsets as `dayStarts`, and this must stay equal to them; a test
-    // runs the two side by side across all seven weekdays. Amrit is the fourth name, index
-    // 3, so it falls in whichever segment brings the cycle round to it.
-    //
-    // The table said {3,0,5,1,6,2,7}, an eighth of the day late on Tuesday, Thursday and
-    // Saturday, so the muhurat list and the chaughariya list showed one period at two
-    // different times on three days in seven.
-    int chaughariyaStart[7] = {0, 3, 6, 2, 5, 1, 4};
-    int amritSegment = (3 - chaughariyaStart[weekday - 1] + 7) % 7;
-    double amritStart = sunriseJD + amritSegment * muhuratLength8;
-    double amritEnd   = amritStart + muhuratLength8;
+    // Amrit Kaal is not a part of the day. It is worked out from the nakshatra, in the
+    // repository -- see NakshatraWindows. It used to be the Amrit chaughariya under another
+    // name, which put it on Yamaganda every Wednesday and on Rahu Kaal every Thursday.
 
-    // ── Godhuli Muhurat: 24 min around sunset ─────────────────────────────
-    double godhuliStart = sunsetJD - (24.0 / 1440.0);
-    double godhuliEnd   = sunsetJD + (24.0 / 1440.0);
+    // ── Godhuli Muhurat: one ghati of the night, from sunset ─────────────
+    //
+    // A ghati of the night -- a thirtieth of it -- beginning as the Sun goes down. Drik
+    // Panchang publishes no rule, and its times fit this: 27 minutes on a winter evening at
+    // New Delhi (5:22-5:49 PM), 20 in June (7:21-7:41 PM), each starting a minute or two
+    // before its sunset. The two minutes here are that lead, fitted to its times; every one
+    // of ten dates checked, winter and summer, lands within a minute. It was 24 minutes either
+    // side of sunset, starting twenty minutes early.
+    double godhuliStart = sunsetJD - (2.0 / 1440.0);
+    double godhuliEnd   = godhuliStart + nightDuration / 30.0;
 
     return @{
         @"abhijitStart":  @(abhijitStart),  @"abhijitEnd":  @(abhijitEnd),
@@ -380,7 +385,6 @@ static void getAmantaMonthDetails(SwissEphWrapper *self, double jd, int *monthIn
         @"yamaStart":     @(yamaStart),     @"yamaEnd":     @(yamaEnd),
         @"gulikStart":    @(gulikStart),    @"gulikEnd":    @(gulikEnd),
         @"brahmaStart":   @(brahmaStart),   @"brahmaEnd":   @(brahmaEnd),
-        @"amritStart":    @(amritStart),    @"amritEnd":    @(amritEnd),
         @"godhuliStart":  @(godhuliStart),  @"godhuliEnd":  @(godhuliEnd),
     };
 }
